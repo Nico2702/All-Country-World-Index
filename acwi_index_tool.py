@@ -560,23 +560,6 @@ with tab_acwi:
     else:
         df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
 
-    # ── DM Cutoff Stock ──────────────────────────────────────────────────────
-    if acwi_variant == "Variant 1 (Global)":
-        cutoff_stock = get_dm_cutoff_stock(df_dm_seg)
-        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
-        df_cutoffs_all = None
-        v2_cutoff_mode = None
-    else:
-        v2_cutoff_mode = st.radio(
-            "V2 EM-Threshold Basis:",
-            ["A — Kleinster Grenzstock (niedrigster Threshold)", "B — Größter Grenzstock (höchster Threshold)"],
-            horizontal=True,
-            help="Bei Variant 2 gibt es pro Land einen eigenen Grenzstock. Welcher davon soll als EM-Referenz dienen?"
-        )
-        mode_key = "min" if "Kleinster" in v2_cutoff_mode else "max"
-        cutoff_stock, df_cutoffs_all = get_dm_cutoff_stock_v2(df_dm, large_thr, mid_thr, small_thr, mode=mode_key)
-        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
-
     # ── EM Method Selection ──────────────────────────────────────────────────
     em_method = st.radio(
         "EM Methodik:",
@@ -584,6 +567,27 @@ with tab_acwi:
         horizontal=True,
         help="Threshold: EM-Aktien brauchen Mindest-MCap relativ zum DM-Grenzstock. Per-Country: innerhalb jedes EM-Lands werden die Top-85% FF MCap eingeschlossen."
     )
+
+    # ── DM Cutoff Stock ──────────────────────────────────────────────────────
+    if acwi_variant == "Variant 1 (Global)":
+        cutoff_stock = get_dm_cutoff_stock(df_dm_seg)
+        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
+        df_cutoffs_all = None
+        v2_cutoff_mode = None
+    else:
+        # V2 EM-Threshold Basis only shown when Threshold method is active
+        if em_method == "Threshold (% des DM Grenzstocks)":
+            v2_cutoff_mode = st.radio(
+                "V2 EM-Threshold Basis:",
+                ["A — Kleinster Grenzstock (niedrigster Threshold)", "B — Größter Grenzstock (höchster Threshold)"],
+                horizontal=True,
+                help="Bei Variant 2 gibt es pro Land einen eigenen Grenzstock. Welcher davon soll als EM-Referenz dienen?"
+            )
+        else:
+            v2_cutoff_mode = None
+        mode_key = "min" if (v2_cutoff_mode and "Kleinster" in v2_cutoff_mode) else "max"
+        cutoff_stock, df_cutoffs_all = get_dm_cutoff_stock_v2(df_dm, large_thr, mid_thr, small_thr, mode=mode_key)
+        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
 
     df_acwi_dm = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
 
