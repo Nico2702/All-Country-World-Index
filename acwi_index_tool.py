@@ -563,9 +563,13 @@ with tab_acwi:
     # ── EM Method Selection ──────────────────────────────────────────────────
     em_method = st.radio(
         "EM Methodik:",
-        ["Threshold (% des DM Grenzstocks)", "Per-Country 85% (wie DM Variant 2)"],
+        [
+            "Threshold (% des DM Grenzstocks)",
+            "Global 85% (wie DM Variant 1)",
+            "Per-Country 85% (wie DM Variant 2)",
+        ],
         horizontal=True,
-        help="Threshold: EM-Aktien brauchen Mindest-MCap relativ zum DM-Grenzstock. Per-Country: innerhalb jedes EM-Lands werden die Top-85% FF MCap eingeschlossen."
+        help="Threshold: Mindest-MCap relativ zum DM-Grenzstock. Global 85%: alle EM global sortiert, Top-85% FF MCap. Per-Country: 85% pro EM-Land."
     )
 
     # ── DM Cutoff Stock — always use global V1 cutoff as EM threshold reference ──
@@ -613,6 +617,26 @@ with tab_acwi:
             yaxis_title="EM Stocks Included", margin=dict(t=10,b=40,l=60,r=10),
         )
         st.plotly_chart(fig_sens, use_container_width=True)
+
+    elif em_method == "Global 85% (wie DM Variant 1)":
+        # ── Global 85% approach (identical logic to DM Variant 1) ───────────
+        df_em_result = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+        df_acwi_em = df_em_result[df_em_result["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
+        em_min_mcap = None
+
+        em_cutoff = get_dm_cutoff_stock(df_em_result)
+        st.markdown(f"""
+        <div class="info-box">
+        <b>EM Global {mid_thr}%-Regel (wie DM Variant 1):</b> Alle EM-Aktien global nach
+        Total MCap sortiert, kumulierte FF MCap gebildet — alle bis {mid_thr}% kommen rein.<br>
+        <b>EM Grenzstock:</b> {em_cutoff["Name"] if em_cutoff is not None else "—"}
+        ({em_cutoff["Exchange Country Name"] if em_cutoff is not None else "—"}) &nbsp;|&nbsp;
+        Total MCap: <b>{format_bn(em_cutoff["Total MCap Y2025"]) if em_cutoff is not None else "—"}</b><br>
+        <b>Ergebnis:</b> <b>{len(df_acwi_em):,} EM-Aktien</b> aus {df_acwi_em["Exchange Country Name"].nunique()} Ländern qualifizieren.
+        </div>
+        """, unsafe_allow_html=True)
+
+        em_col_label = f"EM Included (Global {mid_thr}%)"
 
     else:
         # ── Per-Country 85% approach ─────────────────────────────────────────
@@ -798,8 +822,10 @@ with tab_acwi_compare:
     cutoff_ref = get_dm_cutoff_stock(acwi_dm_v1)
     cutoff_mcap_ref = cutoff_ref["Total MCap Y2025"] if cutoff_ref is not None else 0
     em_thr_df, em_min_mcap_cmp = filter_em_by_threshold(df_em, cutoff_mcap_ref, em_threshold_pct)
-    em_pc_df = filter_em_per_country(df_em, pct=mid_thr)
+    em_g85_df = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+    em_pc_df  = filter_em_per_country(df_em, pct=mid_thr)
     em_thr = em_thr_df[em_thr_df["Segment"] == "EM Included"]
+    em_g85 = em_g85_df[em_g85_df["Segment"].isin(["Large Cap","Mid Cap"])]
     em_pc  = em_pc_df[em_pc_df["Segment"] == "EM Included"]
 
     # ── EM Info Box ──────────────────────────────────────────────────────────
@@ -807,10 +833,8 @@ with tab_acwi_compare:
         st.markdown(f"""
         <div class="info-box">
         <b>EM ist identisch für DM V1 & V2</b><br>
-        EM Threshold: globaler DM-Grenzstock <b>{cutoff_ref["Name"]}</b>
-        ({format_bn(cutoff_mcap_ref)}) &nbsp;→&nbsp;
-        Mindest MCap <b>{format_bn(em_min_mcap_cmp)}</b> ({em_threshold_pct}%) →
-        <b>{len(em_thr):,} Aktien</b> &nbsp;|&nbsp;
+        EM Threshold ({em_threshold_pct}% von {format_bn(cutoff_mcap_ref)}): <b>{len(em_thr):,} Aktien</b> &nbsp;|&nbsp;
+        EM Global {mid_thr}%: <b>{len(em_g85):,} Aktien</b> &nbsp;|&nbsp;
         EM Per-Country {mid_thr}%: <b>{len(em_pc):,} Aktien</b>
         </div>""", unsafe_allow_html=True)
 
@@ -824,13 +848,12 @@ with tab_acwi_compare:
     st.markdown("**ACWI Top-Level Vergleich**")
     st.caption("Gesamt = DM (V1 oder V2) + EM. EM-Spalten sind für beide DM-Varianten identisch.")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("V1 DM Stocks",      f"{len(dm_world_v1):,}")
     col2.metric("V2 DM Stocks",      f"{len(dm_world_v2):,}", delta=f"{len(dm_world_v2)-len(dm_world_v1):+,}")
     col3.metric("EM Threshold",      f"{len(em_thr):,}")
-    col4.metric("EM Per-Country",    f"{len(em_pc):,}")
-    col5.metric("ACWI V1 (Thr.)",    f"{len(acwi_v1_thr):,}")
-    col6.metric("ACWI V2 (Thr.)",    f"{len(acwi_v2_thr):,}", delta=f"{len(acwi_v2_thr)-len(acwi_v1_thr):+,}")
+    col4.metric("EM Global 85%",     f"{len(em_g85):,}")
+    col5.metric("EM Per-Country 85%",f"{len(em_pc):,}")
 
     # Use threshold-based EM for weight comparison (representative)
     ff_acwi_v1 = acwi_v1_thr["Free Float MCap Y2025"].sum()
