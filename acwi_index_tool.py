@@ -258,12 +258,13 @@ c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 st.markdown("---")
 
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
-tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare = st.tabs([
+tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
     "🌍 Universe Overview",
     "📐 Variant 1 — Global DM Thresholds",
     "🗺️ Variant 2 — Per-Country DM Thresholds",
     "🌐 ACWI (DM + EM)",
-    "⚖️ Variant Comparison",
+    "⚖️ Variant Comparison (World)",
+    "🔀 ACWI Comparison (V1 vs V2)",
 ])
 
 
@@ -695,3 +696,164 @@ with tab_compare:
                 ].copy()
                 df_only2["Free Float MCap Y2025"] = df_only2["Free Float MCap Y2025"].apply(format_bn)
                 st.dataframe(df_only2, use_container_width=True, hide_index=True, height=300)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 6: ACWI COMPARISON — V1 vs V2
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_acwi_compare:
+    st.subheader("ACWI Comparison — Variant 1 vs Variant 2 (DM) + EM Threshold")
+
+    # Compute both ACWI versions with same EM threshold
+    acwi_dm_v1 = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+    acwi_dm_v2 = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+
+    cutoff_v1 = get_dm_cutoff_stock(acwi_dm_v1)
+    cutoff_v2 = get_dm_cutoff_stock(acwi_dm_v2)
+
+    # EM filter based on each variant's cutoff
+    em_v1, em_min_v1 = filter_em_by_threshold(df_em, cutoff_v1["Total MCap Y2025"] if cutoff_v1 is not None else 0, em_threshold_pct)
+    em_v2, em_min_v2 = filter_em_by_threshold(df_em, cutoff_v2["Total MCap Y2025"] if cutoff_v2 is not None else 0, em_threshold_pct)
+
+    dm_world_v1 = acwi_dm_v1[acwi_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])]
+    dm_world_v2 = acwi_dm_v2[acwi_dm_v2["Segment"].isin(["Large Cap","Mid Cap"])]
+    em_inc_v1   = em_v1[em_v1["Segment"] == "EM Included"]
+    em_inc_v2   = em_v2[em_v2["Segment"] == "EM Included"]
+
+    acwi_v1_all = pd.concat([dm_world_v1, em_inc_v1], ignore_index=True)
+    acwi_v2_all = pd.concat([dm_world_v2, em_inc_v2], ignore_index=True)
+
+    # ── Cutoff Comparison ────────────────────────────────────────────────────
+    st.markdown("**DM Grenzstock je Variante**")
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        if cutoff_v1 is not None:
+            st.markdown(f"""
+            <div class="info-box">
+            <b>V1 Grenzstock:</b> {cutoff_v1["Name"]}<br>
+            Land: {cutoff_v1["Exchange Country Name"]} &nbsp;|&nbsp;
+            Total MCap: <b>{format_bn(cutoff_v1["Total MCap Y2025"])}</b><br>
+            EM Min MCap: <b>{format_bn(em_min_v1)}</b> ({em_threshold_pct}%) →
+            <b>{len(em_inc_v1):,} EM-Aktien</b>
+            </div>""", unsafe_allow_html=True)
+    with col_c2:
+        if cutoff_v2 is not None:
+            st.markdown(f"""
+            <div class="info-box">
+            <b>V2 Grenzstock:</b> {cutoff_v2["Name"]}<br>
+            Land: {cutoff_v2["Exchange Country Name"]} &nbsp;|&nbsp;
+            Total MCap: <b>{format_bn(cutoff_v2["Total MCap Y2025"])}</b><br>
+            EM Min MCap: <b>{format_bn(em_min_v2)}</b> ({em_threshold_pct}%) →
+            <b>{len(em_inc_v2):,} EM-Aktien</b>
+            </div>""", unsafe_allow_html=True)
+
+    # ── Top-Level Metrics ────────────────────────────────────────────────────
+    st.markdown("**ACWI Top-Level Vergleich**")
+    ff_acwi_v1 = acwi_v1_all["Free Float MCap Y2025"].sum()
+    ff_acwi_v2 = acwi_v2_all["Free Float MCap Y2025"].sum()
+
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1.metric("V1 Total Stocks", f"{len(acwi_v1_all):,}")
+    col2.metric("V2 Total Stocks", f"{len(acwi_v2_all):,}", delta=f"{len(acwi_v2_all)-len(acwi_v1_all):+,}")
+    col3.metric("V1 DM Stocks",    f"{len(dm_world_v1):,}")
+    col4.metric("V2 DM Stocks",    f"{len(dm_world_v2):,}", delta=f"{len(dm_world_v2)-len(dm_world_v1):+,}")
+    col5.metric("V1 EM Stocks",    f"{len(em_inc_v1):,}")
+    col6.metric("V2 EM Stocks",    f"{len(em_inc_v2):,}", delta=f"{len(em_inc_v2)-len(em_inc_v1):+,}")
+
+    # ── DM/EM Weight Comparison ──────────────────────────────────────────────
+    st.markdown("**DM vs EM Gewichtung**")
+    weight_data = pd.DataFrame({
+        "Kategorie": ["DM Weight","EM Weight","DM Weight","EM Weight"],
+        "Variante":  ["Variant 1","Variant 1","Variant 2","Variant 2"],
+        "Weight (%)": [
+            dm_world_v1["Free Float MCap Y2025"].sum()/ff_acwi_v1*100 if ff_acwi_v1>0 else 0,
+            em_inc_v1["Free Float MCap Y2025"].sum()/ff_acwi_v1*100 if ff_acwi_v1>0 else 0,
+            dm_world_v2["Free Float MCap Y2025"].sum()/ff_acwi_v2*100 if ff_acwi_v2>0 else 0,
+            em_inc_v2["Free Float MCap Y2025"].sum()/ff_acwi_v2*100 if ff_acwi_v2>0 else 0,
+        ]
+    })
+    fig_weights = px.bar(
+        weight_data, x="Variante", y="Weight (%)", color="Kategorie", barmode="stack",
+        color_discrete_map={"DM Weight":"#2979ff","EM Weight":"#ce93d8"},
+        template="plotly_dark", text_auto=".1f",
+    )
+    fig_weights.update_layout(paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+                               height=300, margin=dict(t=10,b=40,l=60,r=10))
+    st.plotly_chart(fig_weights, use_container_width=True)
+
+    # ── Per-Country ACWI Breakdown ───────────────────────────────────────────
+    st.markdown("**ACWI Stocks per Country — V1 vs V2**")
+    v1_c = acwi_v1_all.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
+    v2_c = acwi_v2_all.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
+    v1_c.columns = ["Exchange Country Name","Classification","V1 Stocks"]
+    v2_c.columns = ["Exchange Country Name","Classification","V2 Stocks"]
+    cmp_country = v1_c.merge(v2_c, on=["Exchange Country Name","Classification"], how="outer").fillna(0)
+    cmp_country[["V1 Stocks","V2 Stocks"]] = cmp_country[["V1 Stocks","V2 Stocks"]].astype(int)
+    cmp_country["Δ (V2−V1)"] = cmp_country["V2 Stocks"] - cmp_country["V1 Stocks"]
+    cmp_country = cmp_country.sort_values(["Classification","V1 Stocks"], ascending=[True,False])
+
+    fig_country = go.Figure()
+    for cls, col in [("DM","#2979ff"),("EM","#ce93d8")]:
+        sub = cmp_country[cmp_country["Classification"]==cls]
+        fig_country.add_bar(x=sub["Exchange Country Name"], y=sub["V1 Stocks"],
+                            name=f"{cls} V1", marker_color=col, opacity=0.9)
+        fig_country.add_bar(x=sub["Exchange Country Name"], y=sub["V2 Stocks"],
+                            name=f"{cls} V2", marker_color=col, opacity=0.5,
+                            marker_pattern_shape="/")
+    fig_country.update_layout(
+        barmode="group", template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+        height=400, xaxis_tickangle=-45, margin=dict(t=10,b=110,l=60,r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+    )
+    st.plotly_chart(fig_country, use_container_width=True)
+
+    # ── DM Overlap (V1 vs V2) ────────────────────────────────────────────────
+    st.markdown("**DM Stock Overlap (Variant 1 vs Variant 2)**")
+    set_dm_v1 = set(dm_world_v1["Symbol"])
+    set_dm_v2 = set(dm_world_v2["Symbol"])
+    only_dm_v1 = set_dm_v1 - set_dm_v2
+    only_dm_v2 = set_dm_v2 - set_dm_v1
+    both_dm    = set_dm_v1 & set_dm_v2
+
+    ca, cb, cc, cd = st.columns(4)
+    ca.metric("V1 DM only", f"{len(only_dm_v1):,}")
+    cb.metric("In beiden",  f"{len(both_dm):,}")
+    cc.metric("V2 DM only", f"{len(only_dm_v2):,}")
+    cd.metric("Overlap %",  f"{len(both_dm)/max(len(set_dm_v1|set_dm_v2),1)*100:.1f}%")
+
+    if only_dm_v1 or only_dm_v2:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown(f"**Nur in V1 — DM ({len(only_dm_v1)})**")
+            df_o1 = acwi_dm_v1[acwi_dm_v1["Symbol"].isin(only_dm_v1)][
+                ["Symbol","Name","Exchange Country Name","Segment","Total MCap Y2025","Free Float MCap Y2025"]].copy()
+            df_o1["Total MCap Y2025"] = df_o1["Total MCap Y2025"].apply(format_bn)
+            df_o1["Free Float MCap Y2025"] = df_o1["Free Float MCap Y2025"].apply(format_bn)
+            st.dataframe(df_o1, use_container_width=True, hide_index=True, height=280)
+        with col_b:
+            st.markdown(f"**Nur in V2 — DM ({len(only_dm_v2)})**")
+            df_o2 = acwi_dm_v2[acwi_dm_v2["Symbol"].isin(only_dm_v2)][
+                ["Symbol","Name","Exchange Country Name","Segment","Total MCap Y2025","Free Float MCap Y2025"]].copy()
+            df_o2["Total MCap Y2025"] = df_o2["Total MCap Y2025"].apply(format_bn)
+            df_o2["Free Float MCap Y2025"] = df_o2["Free Float MCap Y2025"].apply(format_bn)
+            st.dataframe(df_o2, use_container_width=True, hide_index=True, height=280)
+
+    # ── Downloads ────────────────────────────────────────────────────────────
+    st.markdown("**Downloads**")
+    dl1, dl2 = st.columns(2)
+    with dl1:
+        st.download_button(
+            "⬇️ ACWI Variant 1 als Excel",
+            data=to_excel_download(
+                acwi_v1_all[[c for c in acwi_v1_all.columns if c not in ["cum_ff"]]], "ACWI_V1"),
+            file_name="NaroIX_ACWI_V1.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    with dl2:
+        st.download_button(
+            "⬇️ ACWI Variant 2 als Excel",
+            data=to_excel_download(
+                acwi_v2_all[[c for c in acwi_v2_all.columns if c not in ["cum_ff"]]], "ACWI_V2"),
+            file_name="NaroIX_ACWI_V2.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
