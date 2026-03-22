@@ -58,24 +58,20 @@ def format_bn(val):
 
 
 def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
-    """Global DM threshold approach."""
-    df = df_dm.sort_values("Free Float MCap Y2025", ascending=False).copy()
+    """Global DM threshold approach.
+    Sort by Total MCap desc → cumulative sum on FF MCap → segment by ENDING cum_pct.
+    """
+    df = df_dm.sort_values("Total MCap Y2025", ascending=False).copy()
     total_ff = df["Free Float MCap Y2025"].sum()
     df["cum_ff"] = df["Free Float MCap Y2025"].cumsum()
-    df["cum_pct"] = df["cum_ff"] / total_ff * 100
-
-    # Shift: segment is determined by where cumulative pct crosses the threshold
-    # A stock belongs to Large if its ENDING cumulative % is <= large_pct threshold
-    # Mid: ending cum% between large and mid thresholds
-    # Small: ending cum% between mid and small thresholds
-    df["prev_cum_pct"] = df["cum_pct"].shift(1, fill_value=0)
+    df["cum_pct"] = df["cum_ff"] / total_ff * 100  # ending cumulative %
 
     def assign_segment(row):
-        if row["prev_cum_pct"] < large_pct:
+        if row["cum_pct"] <= large_pct:
             return "Large Cap"
-        elif row["prev_cum_pct"] < mid_pct:
+        elif row["cum_pct"] <= mid_pct:
             return "Mid Cap"
-        elif row["prev_cum_pct"] < small_pct:
+        elif row["cum_pct"] <= small_pct:
             return "Small Cap"
         else:
             return "Micro / Excluded"
@@ -85,10 +81,12 @@ def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
 
 
 def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
-    """Per-country threshold approach."""
+    """Per-country threshold approach.
+    Sort by Total MCap desc within each country → cumulative sum on FF MCap → segment by ENDING cum_pct.
+    """
     results = []
     for country, grp in df_dm.groupby("Exchange Country Name"):
-        grp = grp.sort_values("Free Float MCap Y2025", ascending=False).copy()
+        grp = grp.sort_values("Total MCap Y2025", ascending=False).copy()
         total_ff = grp["Free Float MCap Y2025"].sum()
         if total_ff == 0:
             grp["Segment"] = "Micro / Excluded"
@@ -98,14 +96,13 @@ def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
             continue
         grp["cum_ff"] = grp["Free Float MCap Y2025"].cumsum()
         grp["cum_pct"] = grp["cum_ff"] / total_ff * 100
-        grp["prev_cum_pct"] = grp["cum_pct"].shift(1, fill_value=0)
 
         def assign_segment(row):
-            if row["prev_cum_pct"] < large_pct:
+            if row["cum_pct"] <= large_pct:
                 return "Large Cap"
-            elif row["prev_cum_pct"] < mid_pct:
+            elif row["cum_pct"] <= mid_pct:
                 return "Mid Cap"
-            elif row["prev_cum_pct"] < small_pct:
+            elif row["cum_pct"] <= small_pct:
                 return "Small Cap"
             else:
                 return "Micro / Excluded"
@@ -384,7 +381,7 @@ with tab_v1:
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
     st.download_button(
         "⬇️ Download World Index (Variant 1) as Excel",
-        data=to_excel_download(export_v1.drop(columns=["cum_ff","prev_cum_pct"]), "World_V1"),
+        data=to_excel_download(export_v1.drop(columns=["cum_ff"]), "World_V1"),
         file_name="NaroIX_World_Variant1.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -478,7 +475,7 @@ with tab_v2:
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
     st.download_button(
         "⬇️ Download World Index (Variant 2) as Excel",
-        data=to_excel_download(export_v2.drop(columns=["cum_ff","prev_cum_pct"]), "World_V2"),
+        data=to_excel_download(export_v2.drop(columns=["cum_ff"]), "World_V2"),
         file_name="NaroIX_World_Variant2.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -551,7 +548,7 @@ with tab_acwi:
     st.download_button(
         "⬇️ Download Full ACWI Constituents as Excel",
         data=to_excel_download(
-            df_acwi_export[[c for c in df_acwi_export.columns if c not in ["cum_ff","prev_cum_pct"]]], "ACWI"),
+            df_acwi_export[[c for c in df_acwi_export.columns if c not in ["cum_ff"]]], "ACWI"),
         file_name="NaroIX_ACWI.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
