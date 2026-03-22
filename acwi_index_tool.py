@@ -120,6 +120,24 @@ def build_em_universe(df_em, large_pct, mid_pct, small_pct, mode="global"):
         return compute_variant2(df_em, large_pct, mid_pct, small_pct)
 
 
+def get_dm_cutoff_stock(df_dm_seg):
+    """Return the last DM stock in the World Index (Large+Mid), i.e. the marginal stock at the boundary."""
+    world = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])]
+    if len(world) == 0:
+        return None
+    return world.iloc[-1]
+
+
+def filter_em_by_threshold(df_em, cutoff_total_mcap, pct):
+    """Include EM stocks whose Total MCap >= pct% of the DM cutoff stock Total MCap."""
+    min_mcap = cutoff_total_mcap * (pct / 100.0)
+    df = df_em.copy()
+    df["Segment"] = df["Total MCap Y2025"].apply(
+        lambda x: "EM Included" if x >= min_mcap else "EM Excluded"
+    )
+    return df, min_mcap
+
+
 def segment_summary(df_seg):
     mask = df_seg["Segment"] != "Micro / Excluded"
     segments = ["Large Cap", "Mid Cap", "Small Cap"]
@@ -187,7 +205,14 @@ with st.sidebar:
     small_thr = st.slider("Small Cap cutoff (%)", mid_thr+1, 100, 99, 1,
         help="Cumulative FF MCap threshold for Small Cap inclusion")
 
-    st.markdown("**EM Parameters**")
+    st.markdown("**EM Parameters (ACWI Threshold)**")
+    st.caption("EM-Aktien müssen mindestens X% des Total MCap des letzten DM-Grenzstocks (85%-Cutoff) erreichen.")
+    em_threshold_pct = st.slider(
+        "EM Min MCap (% des DM Cutoff-Stocks)",
+        min_value=1, max_value=200, value=50, step=1,
+        help="EM Total MCap ≥ X% × Total MCap des letzten DM-Stocks im World Index"
+    )
+    st.markdown("**EM Parameters (Standalone Analyse)**")
     em_mode = st.radio("EM Segment Method", ["Global (like Variant 1)", "Per-Country (like Variant 2)"], index=0)
     em_large  = st.slider("EM Large Cap cutoff (%)", 50, 80, 70, 1)
     em_mid    = st.slider("EM Mid Cap cutoff (%)", em_large+1, 95, 85, 1)
@@ -488,62 +513,105 @@ with tab_acwi:
     st.subheader("ACWI — All Country World Index (DM + EM)")
 
     acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global)", "Variant 2 (Per-Country)"], horizontal=True)
-    em_method_str = "global" if "Global" in em_mode else "per-country"
 
     if acwi_variant == "Variant 1 (Global)":
         df_dm_seg = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
     else:
         df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
 
-    df_em_seg = build_em_universe(df_em, em_large, em_mid, em_small, mode=em_method_str)
+    # ── DM Cutoff Stock ──────────────────────────────────────────────────────
+    cutoff_stock = get_dm_cutoff_stock(df_dm_seg)
+    cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
 
-    df_acwi_dm = df_dm_seg[df_dm_seg["Segment"] != "Micro / Excluded"].copy()
-    df_acwi_em = df_em_seg[df_em_seg["Segment"] != "Micro / Excluded"].copy()
+    # ── EM Threshold Filter ──────────────────────────────────────────────────
+    df_em_thr, em_min_mcap = filter_em_by_threshold(df_em, cutoff_total_mcap, em_threshold_pct)
+    df_acwi_dm = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
+    df_acwi_em = df_em_thr[df_em_thr["Segment"] == "EM Included"].copy()
+
+    # ── Threshold Info Box ───────────────────────────────────────────────────
+    if cutoff_stock is not None:
+        st.markdown(f"""
+        <div class="info-box">
+        <b>DM Grenzstock (letzter im World Index):</b>
+        {cutoff_stock["Name"]} ({cutoff_stock["Exchange Country Name"]}) &nbsp;|&nbsp;
+        Total MCap: <b>{format_bn(cutoff_total_mcap)}</b> &nbsp;|&nbsp;
+        cum. FF MCap: <b>{cutoff_stock["cum_pct"]:.3f}%</b><br>
+        <b>EM Mindest Total MCap:</b> {em_threshold_pct}% × {format_bn(cutoff_total_mcap)} = <b>{format_bn(em_min_mcap)}</b>
+        &nbsp;→&nbsp; <b>{len(df_acwi_em):,} EM-Aktien</b> qualifizieren
+        </div>
+        """, unsafe_allow_html=True)
 
     total_acwi = len(df_acwi_dm) + len(df_acwi_em)
     total_ff_acwi = df_acwi_dm["Free Float MCap Y2025"].sum() + df_acwi_em["Free Float MCap Y2025"].sum()
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("ACWI Total Stocks", f"{total_acwi:,}")
     c2.metric("ACWI FF MCap", format_bn(total_ff_acwi))
-    c3.metric("DM Weight", f"{df_acwi_dm['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.1f}%")
-    c4.metric("EM Weight", f"{df_acwi_em['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.1f}%")
+    c3.metric("DM Stocks (World)", f"{len(df_acwi_dm):,}")
+    c4.metric("EM Stocks", f"{len(df_acwi_em):,}")
+    c5.metric("EM Weight", f"{df_acwi_em['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.1f}%" if total_ff_acwi > 0 else "—")
 
     col_dm, col_em = st.columns(2)
 
     with col_dm:
-        st.markdown("**DM Segments**")
+        st.markdown("**DM Segments (World Index)**")
         s = segment_summary(df_dm_seg)
         s["FF MCap (USD)"] = s["FF MCap (USD)"].apply(format_bn)
         s["Avg FF MCap (USD)"] = s["Avg FF MCap (USD)"].apply(format_bn)
         st.dataframe(s, use_container_width=True, hide_index=True)
 
     with col_em:
-        st.markdown("**EM Segments**")
-        s2 = segment_summary(df_em_seg)
-        s2["FF MCap (USD)"] = s2["FF MCap (USD)"].apply(format_bn)
-        s2["Avg FF MCap (USD)"] = s2["Avg FF MCap (USD)"].apply(format_bn)
-        st.dataframe(s2, use_container_width=True, hide_index=True)
+        st.markdown(f"**EM Included (Total MCap ≥ {format_bn(em_min_mcap)})**")
+        em_country = df_acwi_em.groupby("Exchange Country Name").agg(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_Total_MCap=("Total MCap Y2025","mean"),
+        ).sort_values("FF_MCap", ascending=False).reset_index()
+        em_country["FF MCap (USD)"] = em_country["FF_MCap"].apply(format_bn)
+        em_country["Avg Total MCap"] = em_country["Avg_Total_MCap"].apply(format_bn)
+        em_country["Weight (%)"] = (em_country["FF_MCap"] / em_country["FF_MCap"].sum() * 100).round(2)
+        st.dataframe(em_country[["Exchange Country Name","Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]],
+                     use_container_width=True, hide_index=True)
 
-    # Combined donut
+    # ── EM Threshold Sensitivity ─────────────────────────────────────────────
+    st.markdown("**EM Sensitivity — Anzahl qualifizierter EM-Aktien je Threshold**")
+    sens_pcts = list(range(10, 210, 10))
+    sens_counts = [len(df_em[df_em["Total MCap Y2025"] >= cutoff_total_mcap * p / 100]) for p in sens_pcts]
+    fig_sens = go.Figure()
+    fig_sens.add_trace(go.Scatter(
+        x=sens_pcts, y=sens_counts, mode="lines+markers",
+        line=dict(color="#ce93d8", width=2), marker=dict(size=5),
+        name="EM Stocks included"
+    ))
+    fig_sens.add_vline(x=em_threshold_pct, line_dash="dash", line_color="#ffc107",
+                       annotation_text=f"Current: {em_threshold_pct}% → {len(df_acwi_em)} stocks",
+                       annotation_position="top right")
+    fig_sens.update_layout(
+        template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+        height=280, xaxis_title="EM Threshold (% of DM Cutoff Stock Total MCap)",
+        yaxis_title="EM Stocks Included", margin=dict(t=10,b=40,l=60,r=10),
+    )
+    st.plotly_chart(fig_sens, use_container_width=True)
+
+    # ── Combined Donut ───────────────────────────────────────────────────────
     st.markdown("**ACWI Composition**")
     acwi_summary = []
-    for seg in ["Large Cap","Mid Cap","Small Cap"]:
+    for seg in ["Large Cap", "Mid Cap"]:
         dm_ff = df_acwi_dm[df_acwi_dm["Segment"]==seg]["Free Float MCap Y2025"].sum()
-        em_ff = df_acwi_em[df_acwi_em["Segment"]==seg]["Free Float MCap Y2025"].sum()
-        if dm_ff > 0: acwi_summary.append({"Label":f"DM {seg}","FF MCap":dm_ff,"Type":"DM"})
-        if em_ff > 0: acwi_summary.append({"Label":f"EM {seg}","FF MCap":em_ff,"Type":"EM"})
+        if dm_ff > 0: acwi_summary.append({"Label": f"DM {seg}", "FF MCap": dm_ff, "Type": "DM"})
+    em_ff_total = df_acwi_em["Free Float MCap Y2025"].sum()
+    if em_ff_total > 0: acwi_summary.append({"Label": "EM Included", "FF MCap": em_ff_total, "Type": "EM"})
     acwi_df_summary = pd.DataFrame(acwi_summary)
 
     fig_acwi = px.pie(
         acwi_df_summary, names="Label", values="FF MCap",
-        color="Type", color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"},
+        color="Type", color_discrete_map={"DM": "#2979ff", "EM": "#ce93d8"},
         template="plotly_dark", hole=0.45,
     )
     fig_acwi.update_layout(paper_bgcolor="#0f1117", height=350, margin=dict(t=10,b=10))
     st.plotly_chart(fig_acwi, use_container_width=True)
 
-    # Full ACWI download
+    # ── Download ─────────────────────────────────────────────────────────────
     df_acwi_export = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
     st.download_button(
         "⬇️ Download Full ACWI Constituents as Excel",
