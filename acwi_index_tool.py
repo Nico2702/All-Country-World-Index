@@ -225,7 +225,6 @@ def load_excel(file):
 with st.sidebar:
     st.markdown("### 📁 Data Source")
     uploaded = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
-    use_default = st.checkbox("Use default file (Framework_NaroIX)", value=True)
 
     st.markdown("---")
     st.markdown("### ⚙️ Index Parameters")
@@ -260,14 +259,8 @@ with st.sidebar:
 # ─── Load Data ─────────────────────────────────────────────────────────────────
 if uploaded:
     df_raw = load_excel(uploaded)
-elif use_default:
-    try:
-        df_raw = load_excel("/mnt/user-data/uploads/Framework_NaroIX_Year-by-Year_2.xlsx")
-    except:
-        st.error("Default file not found. Please upload an Excel file.")
-        st.stop()
 else:
-    st.info("Please upload an Excel file or check 'Use default file'.")
+    st.info("👆 Bitte eine Excel-Datei hochladen um zu starten.")
     st.stop()
 
 # Apply listing filter
