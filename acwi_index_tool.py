@@ -189,6 +189,17 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
+def apply_min_filters(df, min_ff_mcap_m=0, min_adtv_6m_m=0, min_adtv_12m_m=0):
+    """Filter out stocks below minimum FF MCap or ADTV thresholds.
+    Values are in Mio. USD (millions). 0 = no filter applied.
+    """
+    mask = pd.Series(True, index=df.index)
+    if min_ff_mcap_m  > 0: mask &= df["Free Float MCap Y2025"] >= min_ff_mcap_m  * 1e6
+    if min_adtv_6m_m  > 0: mask &= df["6M ADTV Y2025"]         >= min_adtv_6m_m  * 1e6
+    if min_adtv_12m_m > 0: mask &= df["12M ADTV Y2025"]        >= min_adtv_12m_m * 1e6
+    return df[mask].copy()
+
+
 def segment_summary(df_seg):
     mask = df_seg["Segment"] != "Micro / Excluded"
     segments = ["Large Cap", "Mid Cap", "Small Cap"]
@@ -265,6 +276,32 @@ with st.sidebar:
 
 
     st.markdown("---")
+    st.markdown("### 🔍 Minimum Filters")
+    st.caption("Aktien die einen dieser Werte unterschreiten werden vor der Segment-Berechnung ausgeschlossen.")
+
+    st.markdown("**DM Filter**")
+    dm_min_ff_mcap = st.number_input(
+        "DM Min FF MCap (Mio. USD)", min_value=0, value=0, step=50,
+        help="Mindest Free Float MCap in Mio. USD. 0 = kein Filter.")
+    dm_min_adtv_6m = st.number_input(
+        "DM Min 6M ADTV (Mio. USD)", min_value=0, value=0, step=1,
+        help="Mindest 6-Monats ADTV in Mio. USD. 0 = kein Filter.")
+    dm_min_adtv_12m = st.number_input(
+        "DM Min 12M ADTV (Mio. USD)", min_value=0, value=0, step=1,
+        help="Mindest 12-Monats ADTV in Mio. USD. 0 = kein Filter.")
+
+    st.markdown("**EM Filter**")
+    em_min_ff_mcap = st.number_input(
+        "EM Min FF MCap (Mio. USD)", min_value=0, value=0, step=50,
+        help="Mindest Free Float MCap in Mio. USD. 0 = kein Filter.")
+    em_min_adtv_6m = st.number_input(
+        "EM Min 6M ADTV (Mio. USD)", min_value=0, value=0, step=1,
+        help="Mindest 6-Monats ADTV in Mio. USD. 0 = kein Filter.")
+    em_min_adtv_12m = st.number_input(
+        "EM Min 12M ADTV (Mio. USD)", min_value=0, value=0, step=1,
+        help="Mindest 12-Monats ADTV in Mio. USD. 0 = kein Filter.")
+
+    st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
 
 
@@ -279,8 +316,14 @@ else:
 if listing_filter == "Primary only":
     df_raw = df_raw[df_raw["Listing"] == "Primary"].copy()
 
-df_dm = df_raw[df_raw["Classification"] == "DM"].copy()
-df_em = df_raw[df_raw["Classification"] == "EM"].copy()
+df_dm_raw = df_raw[df_raw["Classification"] == "DM"].copy()
+df_em_raw = df_raw[df_raw["Classification"] == "EM"].copy()
+
+df_dm = apply_min_filters(df_dm_raw, dm_min_ff_mcap, dm_min_adtv_6m, dm_min_adtv_12m)
+df_em = apply_min_filters(df_em_raw, em_min_ff_mcap, em_min_adtv_6m, em_min_adtv_12m)
+
+dm_filtered_out = len(df_dm_raw) - len(df_dm)
+em_filtered_out = len(df_em_raw) - len(df_em)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -290,10 +333,29 @@ st.markdown("<div style='color:#8892b0;margin-top:-12px;margin-bottom:20px;'>ACW
 # Top metrics
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Total Universe", f"{len(df_raw):,}")
-c2.metric("DM Stocks", f"{len(df_dm):,}")
-c3.metric("EM Stocks", f"{len(df_em):,}")
+c2.metric("DM Stocks", f"{len(df_dm):,}",
+    delta=f"{-dm_filtered_out:,} gefiltert" if dm_filtered_out > 0 else None,
+    delta_color="inverse")
+c3.metric("EM Stocks", f"{len(df_em):,}",
+    delta=f"{-em_filtered_out:,} gefiltert" if em_filtered_out > 0 else None,
+    delta_color="inverse")
 c4.metric("DM FF MCap", format_bn(df_dm["Free Float MCap Y2025"].sum()))
 c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
+
+# Filter warning if active
+active_filters = []
+if dm_min_ff_mcap  > 0: active_filters.append(f"DM FF MCap ≥ {dm_min_ff_mcap:,}M")
+if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,}M")
+if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,}M")
+if em_min_ff_mcap  > 0: active_filters.append(f"EM FF MCap ≥ {em_min_ff_mcap:,}M")
+if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,}M")
+if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,}M")
+if active_filters:
+    st.markdown(f"""<div class="warning-box">
+    ⚠️ <b>Aktive Filter:</b> {" &nbsp;|&nbsp; ".join(active_filters)} &nbsp;—&nbsp;
+    DM: <b>{dm_filtered_out:,}</b> Stocks ausgeschlossen &nbsp;|&nbsp;
+    EM: <b>{em_filtered_out:,}</b> Stocks ausgeschlossen
+    </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
 
