@@ -861,8 +861,8 @@ with tab_acwi_compare:
 
     # ── Per-Country ACWI Breakdown ───────────────────────────────────────────
     st.markdown("**ACWI Stocks per Country — V1 vs V2**")
-    v1_c = acwi_v1_all.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
-    v2_c = acwi_v2_all.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
+    v1_c = acwi_v1_thr.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
+    v2_c = acwi_v2_thr.groupby(["Exchange Country Name","Classification"])["Symbol"].count().reset_index()
     v1_c.columns = ["Exchange Country Name","Classification","V1 Stocks"]
     v2_c.columns = ["Exchange Country Name","Classification","V2 Stocks"]
     cmp_country = v1_c.merge(v2_c, on=["Exchange Country Name","Classification"], how="outer").fillna(0)
@@ -923,7 +923,7 @@ with tab_acwi_compare:
         st.download_button(
             "⬇️ ACWI Variant 1 als Excel",
             data=to_excel_download(
-                acwi_v1_all[[c for c in acwi_v1_all.columns if c not in ["cum_ff"]]], "ACWI_V1"),
+                acwi_v1_thr[[c for c in acwi_v1_thr.columns if c not in ["cum_ff"]]], "ACWI_V1"),
             file_name="NaroIX_ACWI_V1.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
@@ -931,7 +931,7 @@ with tab_acwi_compare:
         st.download_button(
             "⬇️ ACWI Variant 2 als Excel",
             data=to_excel_download(
-                acwi_v2_all[[c for c in acwi_v2_all.columns if c not in ["cum_ff"]]], "ACWI_V2"),
+                acwi_v2_thr[[c for c in acwi_v2_thr.columns if c not in ["cum_ff"]]], "ACWI_V2"),
             file_name="NaroIX_ACWI_V2.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
