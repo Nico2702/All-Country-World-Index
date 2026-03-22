@@ -568,26 +568,10 @@ with tab_acwi:
         help="Threshold: EM-Aktien brauchen Mindest-MCap relativ zum DM-Grenzstock. Per-Country: innerhalb jedes EM-Lands werden die Top-85% FF MCap eingeschlossen."
     )
 
-    # ── DM Cutoff Stock ──────────────────────────────────────────────────────
-    if acwi_variant == "Variant 1 (Global)":
-        cutoff_stock = get_dm_cutoff_stock(df_dm_seg)
-        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
-        df_cutoffs_all = None
-        v2_cutoff_mode = None
-    else:
-        # V2 EM-Threshold Basis only shown when Threshold method is active
-        if em_method == "Threshold (% des DM Grenzstocks)":
-            v2_cutoff_mode = st.radio(
-                "V2 EM-Threshold Basis:",
-                ["A — Kleinster Grenzstock (niedrigster Threshold)", "B — Größter Grenzstock (höchster Threshold)"],
-                horizontal=True,
-                help="Bei Variant 2 gibt es pro Land einen eigenen Grenzstock. Welcher davon soll als EM-Referenz dienen?"
-            )
-        else:
-            v2_cutoff_mode = None
-        mode_key = "min" if (v2_cutoff_mode and "Kleinster" in v2_cutoff_mode) else "max"
-        cutoff_stock, df_cutoffs_all = get_dm_cutoff_stock_v2(df_dm, large_thr, mid_thr, small_thr, mode=mode_key)
-        cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
+    # ── DM Cutoff Stock — always use global V1 cutoff as EM threshold reference ──
+    dm_seg_v1_ref = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+    cutoff_stock = get_dm_cutoff_stock(dm_seg_v1_ref)
+    cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
 
     df_acwi_dm = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
 
@@ -598,32 +582,16 @@ with tab_acwi:
 
         # Info box
         if cutoff_stock is not None:
-            if acwi_variant == "Variant 1 (Global)":
-                extra = f"cum. FF MCap: <b>{cutoff_stock['cum_pct']:.3f}%</b>"
-                label = "DM Grenzstock (globaler 85%-Cutoff)"
-            else:
-                label = f"DM Grenzstock (V2 — {'kleinster' if 'Kleinster' in v2_cutoff_mode else 'größter'} länderspezifischer Cutoff)"
-                n_countries = len(df_cutoffs_all) if df_cutoffs_all is not None else "—"
-                extra = f"Grenzstocks aus <b>{n_countries} Ländern</b> analysiert"
             st.markdown(f"""
             <div class="info-box">
-            <b>{label}:</b> {cutoff_stock["Name"]} ({cutoff_stock["Exchange Country Name"]}) &nbsp;|&nbsp;
-            Total MCap: <b>{format_bn(cutoff_total_mcap)}</b> &nbsp;|&nbsp; {extra}<br>
+            <b>DM Grenzstock (globaler 85%-Cutoff — EM-Referenz):</b>
+            {cutoff_stock["Name"]} ({cutoff_stock["Exchange Country Name"]}) &nbsp;|&nbsp;
+            Total MCap: <b>{format_bn(cutoff_total_mcap)}</b> &nbsp;|&nbsp;
+            cum. FF MCap: <b>{cutoff_stock["cum_pct"]:.3f}%</b><br>
             <b>EM Mindest Total MCap:</b> {em_threshold_pct}% × {format_bn(cutoff_total_mcap)} = <b>{format_bn(em_min_mcap)}</b>
             &nbsp;→&nbsp; <b>{len(df_acwi_em):,} EM-Aktien</b> qualifizieren
             </div>
             """, unsafe_allow_html=True)
-
-        # V2 cutoff table
-        if acwi_variant == "Variant 2 (Per-Country)" and df_cutoffs_all is not None and len(df_cutoffs_all) > 0:
-            with st.expander(f"📋 Alle länderspezifischen DM-Grenzstocks ({len(df_cutoffs_all)} Länder)"):
-                disp_cutoffs = df_cutoffs_all[["Country","Name","Total MCap Y2025","Free Float MCap Y2025","cum_pct"]].copy()
-                disp_cutoffs = disp_cutoffs.sort_values("Total MCap Y2025", ascending=False).reset_index(drop=True)
-                disp_cutoffs["Total MCap Y2025"] = disp_cutoffs["Total MCap Y2025"].apply(format_bn)
-                disp_cutoffs["Free Float MCap Y2025"] = disp_cutoffs["Free Float MCap Y2025"].apply(format_bn)
-                disp_cutoffs["cum_pct"] = disp_cutoffs["cum_pct"].round(3).astype(str) + "%"
-                disp_cutoffs.columns = ["Land","Grenzstock","Total MCap","FF MCap","cum. FF% (im Land)"]
-                st.dataframe(disp_cutoffs, use_container_width=True, hide_index=True)
 
         em_col_label = f"EM Included (Total MCap ≥ {format_bn(em_min_mcap)})"
 
@@ -827,15 +795,10 @@ with tab_acwi_compare:
     # V1 cutoff: single global stock
     cutoff_v1 = get_dm_cutoff_stock(acwi_dm_v1)
 
-    # V2 cutoff: user selects A (min) or B (max) across all country cutoffs
-    v2_mode_cmp = st.radio(
-        "V2 EM-Threshold Basis (für ACWI Vergleich):",
-        ["A — Kleinster Grenzstock (niedrigster Threshold)", "B — Größter Grenzstock (höchster Threshold)"],
-        horizontal=True,
-        help="Welcher länderspezifische Grenzstock aus Variant 2 soll als EM-Referenz dienen?"
-    )
-    mode_key_cmp = "min" if "Kleinster" in v2_mode_cmp else "max"
-    cutoff_v2, df_cutoffs_v2 = get_dm_cutoff_stock_v2(df_dm, large_thr, mid_thr, small_thr, mode=mode_key_cmp)
+    # Both variants use the same global V1 cutoff as EM threshold reference
+    cutoff_v2 = cutoff_v1
+    df_cutoffs_v2 = None
+    v2_mode_cmp = None
 
     # ── EM Method Selection (Comparison Tab) ────────────────────────────────
     em_method_cmp = st.radio(
@@ -868,40 +831,17 @@ with tab_acwi_compare:
     acwi_v1_all = pd.concat([dm_world_v1, em_inc_v1], ignore_index=True)
     acwi_v2_all = pd.concat([dm_world_v2, em_inc_v2], ignore_index=True)
 
-    # ── Cutoff Comparison ────────────────────────────────────────────────────
-    if em_method_cmp == "Threshold (% des DM Grenzstocks)":
-        st.markdown("**DM Grenzstock je Variante**")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            if cutoff_v1 is not None:
-                st.markdown(f"""
-                <div class="info-box">
-                <b>V1 Grenzstock:</b> {cutoff_v1["Name"]}<br>
-                Land: {cutoff_v1["Exchange Country Name"]} &nbsp;|&nbsp;
-                Total MCap: <b>{format_bn(cutoff_v1["Total MCap Y2025"])}</b><br>
-                EM Min MCap: <b>{format_bn(em_min_v1)}</b> ({em_threshold_pct}%) →
-                <b>{len(em_inc_v1):,} EM-Aktien</b>
-                </div>""", unsafe_allow_html=True)
-        with col_c2:
-            if cutoff_v2 is not None:
-                v2_label = "kleinster" if "Kleinster" in v2_mode_cmp else "größter"
-                n_c = len(df_cutoffs_v2) if df_cutoffs_v2 is not None else "—"
-                st.markdown(f"""
-                <div class="info-box">
-                <b>V2 Grenzstock ({v2_label} von {n_c} Ländern):</b> {cutoff_v2["Name"]}<br>
-                Land: {cutoff_v2["Exchange Country Name"]} &nbsp;|&nbsp;
-                Total MCap: <b>{format_bn(cutoff_v2["Total MCap Y2025"])}</b><br>
-                EM Min MCap: <b>{format_bn(em_min_v2)}</b> ({em_threshold_pct}%) →
-                <b>{len(em_inc_v2):,} EM-Aktien</b>
-                </div>""", unsafe_allow_html=True)
-            if df_cutoffs_v2 is not None and len(df_cutoffs_v2) > 0:
-                with st.expander(f"📋 Alle V2 Grenzstocks ({len(df_cutoffs_v2)} Länder)"):
-                    disp = df_cutoffs_v2[["Country","Name","Total MCap Y2025","cum_pct"]].copy()
-                    disp = disp.sort_values("Total MCap Y2025", ascending=False).reset_index(drop=True)
-                    disp["Total MCap Y2025"] = disp["Total MCap Y2025"].apply(format_bn)
-                    disp["cum_pct"] = disp["cum_pct"].round(3).astype(str) + "%"
-                    disp.columns = ["Land","Grenzstock","Total MCap","cum. FF% (im Land)"]
-                    st.dataframe(disp, use_container_width=True, hide_index=True)
+    # ── EM Threshold Info Box ────────────────────────────────────────────────
+    if em_method_cmp == "Threshold (% des DM Grenzstocks)" and cutoff_v1 is not None:
+        st.markdown(f"""
+        <div class="info-box">
+        <b>EM-Referenz (globaler DM-Grenzstock, identisch für V1 & V2):</b>
+        {cutoff_v1["Name"]} ({cutoff_v1["Exchange Country Name"]}) &nbsp;|&nbsp;
+        Total MCap: <b>{format_bn(cutoff_v1["Total MCap Y2025"])}</b> &nbsp;|&nbsp;
+        cum. FF MCap: <b>{cutoff_v1["cum_pct"]:.3f}%</b><br>
+        <b>EM Mindest Total MCap:</b> {em_threshold_pct}% × {format_bn(cutoff_v1["Total MCap Y2025"])} =
+        <b>{format_bn(em_min_v1)}</b> &nbsp;→&nbsp; <b>{len(em_inc_v1):,} EM-Aktien</b> (gleich für V1 & V2)
+        </div>""", unsafe_allow_html=True)
 
     # ── Top-Level Metrics ────────────────────────────────────────────────────
     st.markdown("**ACWI Top-Level Vergleich**")
