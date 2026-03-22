@@ -112,14 +112,6 @@ def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
     return pd.concat(results, ignore_index=True)
 
 
-def build_em_universe(df_em, large_pct, mid_pct, small_pct, mode="global"):
-    """Build EM segments (same logic, global or per-country)."""
-    if mode == "global":
-        return compute_variant1(df_em, large_pct, mid_pct, small_pct)
-    else:
-        return compute_variant2(df_em, large_pct, mid_pct, small_pct)
-
-
 def get_dm_cutoff_stock(df_dm_seg):
     """Return the last DM stock in the World Index (V1: global sort → simply last row included)."""
     world = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])]
@@ -246,11 +238,7 @@ with st.sidebar:
         min_value=1, max_value=200, value=50, step=1,
         help="EM Total MCap ≥ X% × Total MCap des letzten DM-Stocks im World Index"
     )
-    st.markdown("**EM Parameters (Standalone Analyse)**")
-    em_mode = st.radio("EM Segment Method", ["Global (like Variant 1)", "Per-Country (like Variant 2)"], index=0)
-    em_large  = st.slider("EM Large Cap cutoff (%)", 50, 80, 70, 1)
-    em_mid    = st.slider("EM Mid Cap cutoff (%)", em_large+1, 95, 85, 1)
-    em_small  = st.slider("EM Small Cap cutoff (%)", em_mid+1, 100, 99, 1)
+
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
