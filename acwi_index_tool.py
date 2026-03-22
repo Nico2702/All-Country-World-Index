@@ -316,14 +316,12 @@ else:
 if listing_filter == "Primary only":
     df_raw = df_raw[df_raw["Listing"] == "Primary"].copy()
 
-df_dm_raw = df_raw[df_raw["Classification"] == "DM"].copy()
-df_em_raw = df_raw[df_raw["Classification"] == "EM"].copy()
+df_dm = df_raw[df_raw["Classification"] == "DM"].copy()
+df_em = df_raw[df_raw["Classification"] == "EM"].copy()
 
-df_dm = apply_min_filters(df_dm_raw, dm_min_ff_mcap, dm_min_adtv_6m, dm_min_adtv_12m)
-df_em = apply_min_filters(df_em_raw, em_min_ff_mcap, em_min_adtv_6m, em_min_adtv_12m)
-
-dm_filtered_out = len(df_dm_raw) - len(df_dm)
-em_filtered_out = len(df_em_raw) - len(df_em)
+# Post-segment filter lambdas — applied AFTER segment computation
+dm_post_filter = lambda df: apply_min_filters(df, dm_min_ff_mcap, dm_min_adtv_6m, dm_min_adtv_12m)
+em_post_filter = lambda df: apply_min_filters(df, em_min_ff_mcap, em_min_adtv_6m, em_min_adtv_12m)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -333,16 +331,12 @@ st.markdown("<div style='color:#8892b0;margin-top:-12px;margin-bottom:20px;'>ACW
 # Top metrics
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Total Universe", f"{len(df_raw):,}")
-c2.metric("DM Stocks", f"{len(df_dm):,}",
-    delta=f"{-dm_filtered_out:,} gefiltert" if dm_filtered_out > 0 else None,
-    delta_color="inverse")
-c3.metric("EM Stocks", f"{len(df_em):,}",
-    delta=f"{-em_filtered_out:,} gefiltert" if em_filtered_out > 0 else None,
-    delta_color="inverse")
+c2.metric("DM Stocks", f"{len(df_dm):,}")
+c3.metric("EM Stocks", f"{len(df_em):,}")
 c4.metric("DM FF MCap", format_bn(df_dm["Free Float MCap Y2025"].sum()))
 c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 
-# Filter warning if active
+# Show active filter summary (post-segment filters)
 active_filters = []
 if dm_min_ff_mcap  > 0: active_filters.append(f"DM FF MCap ≥ {dm_min_ff_mcap:,}M")
 if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,}M")
@@ -352,9 +346,8 @@ if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,
 if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,}M")
 if active_filters:
     st.markdown(f"""<div class="warning-box">
-    ⚠️ <b>Aktive Filter:</b> {" &nbsp;|&nbsp; ".join(active_filters)} &nbsp;—&nbsp;
-    DM: <b>{dm_filtered_out:,}</b> Stocks ausgeschlossen &nbsp;|&nbsp;
-    EM: <b>{em_filtered_out:,}</b> Stocks ausgeschlossen
+    ⚠️ <b>Aktive Post-Segment Filter:</b> {" &nbsp;|&nbsp; ".join(active_filters)}<br>
+    Filter werden <b>nach</b> der Segment-Berechnung angewendet — Stocks die den Threshold nicht erfüllen werden aus dem finalen Index ausgeschlossen.
     </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -456,7 +449,7 @@ with tab_v1:
         )
         st.dataframe(disp, use_container_width=True, hide_index=True)
 
-        world_idx = df_v1[df_v1["Segment"].isin(["Large Cap","Mid Cap"])]
+        world_idx = dm_post_filter(df_v1[df_v1["Segment"].isin(["Large Cap","Mid Cap"])])
         st.success(f"🌐 **World Index (DM):** {len(world_idx):,} Stocks | {format_bn(world_idx['Free Float MCap Y2025'].sum())} FF MCap")
 
     with col_s2:
@@ -505,7 +498,7 @@ with tab_v1:
     st.dataframe(world_country.drop(columns="FF_MCap"), use_container_width=True, hide_index=True)
 
     # Download
-    export_v1 = df_v1[df_v1["Segment"] != "Micro / Excluded"].copy()
+    export_v1 = dm_post_filter(df_v1[df_v1["Segment"] != "Micro / Excluded"]).copy()
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
     st.download_button(
         "⬇️ Download World Index (Variant 1) as Excel",
@@ -545,7 +538,7 @@ with tab_v2:
         )
         st.dataframe(disp2, use_container_width=True, hide_index=True)
 
-        world_v2 = df_v2[df_v2["Segment"].isin(["Large Cap","Mid Cap"])]
+        world_v2 = dm_post_filter(df_v2[df_v2["Segment"].isin(["Large Cap","Mid Cap"])])
         st.success(f"🌐 **World Index (DM):** {len(world_v2):,} Stocks | {format_bn(world_v2['Free Float MCap Y2025'].sum())} FF MCap")
 
     with col_s2:
@@ -599,7 +592,7 @@ with tab_v2:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    export_v2 = df_v2[df_v2["Segment"] != "Micro / Excluded"].copy()
+    export_v2 = dm_post_filter(df_v2[df_v2["Segment"] != "Micro / Excluded"]).copy()
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
     st.download_button(
         "⬇️ Download World Index (Variant 2) as Excel",
@@ -639,12 +632,12 @@ with tab_acwi:
     cutoff_stock = get_dm_cutoff_stock(dm_seg_v1_ref)
     cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
 
-    df_acwi_dm = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
+    df_acwi_dm = dm_post_filter(df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])]).copy()
 
     if em_method == "Threshold (% des DM Grenzstocks)":
         # ── Threshold approach ───────────────────────────────────────────────
         df_em_result, em_min_mcap = filter_em_by_threshold(df_em, cutoff_total_mcap, em_threshold_pct)
-        df_acwi_em = df_em_result[df_em_result["Segment"] == "EM Included"].copy()
+        df_acwi_em = em_post_filter(df_em_result[df_em_result["Segment"] == "EM Included"]).copy()
 
         # Info box
         if cutoff_stock is not None:
@@ -683,7 +676,7 @@ with tab_acwi:
     elif em_method == "Global 85% (wie DM Variant 1)":
         # ── Global 85% approach (identical logic to DM Variant 1) ───────────
         df_em_result = compute_variant1(df_em, large_thr, mid_thr, small_thr)
-        df_acwi_em = df_em_result[df_em_result["Segment"].isin(["Large Cap", "Mid Cap"])].copy()
+        df_acwi_em = em_post_filter(df_em_result[df_em_result["Segment"].isin(["Large Cap", "Mid Cap"])]).copy()
         em_min_mcap = None
 
         em_cutoff = get_dm_cutoff_stock(df_em_result)
@@ -703,7 +696,7 @@ with tab_acwi:
     else:
         # ── Per-Country 85% approach ─────────────────────────────────────────
         df_em_result = filter_em_per_country(df_em, pct=mid_thr)
-        df_acwi_em = df_em_result[df_em_result["Segment"] == "EM Included"].copy()
+        df_acwi_em = em_post_filter(df_em_result[df_em_result["Segment"] == "EM Included"]).copy()
         em_min_mcap = None
 
         st.markdown(f"""
@@ -802,8 +795,8 @@ with tab_compare:
     df_v1_c = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
     df_v2_c = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
 
-    world_v1 = df_v1_c[df_v1_c["Segment"].isin(["Large Cap","Mid Cap"])]
-    world_v2 = df_v2_c[df_v2_c["Segment"].isin(["Large Cap","Mid Cap"])]
+    world_v1 = dm_post_filter(df_v1_c[df_v1_c["Segment"].isin(["Large Cap","Mid Cap"])])
+    world_v2 = dm_post_filter(df_v2_c[df_v2_c["Segment"].isin(["Large Cap","Mid Cap"])])
 
     # Overlap analysis
     set_v1 = set(world_v1["Symbol"].unique())
@@ -877,8 +870,8 @@ with tab_acwi_compare:
     # ── Compute DM both variants ─────────────────────────────────────────────
     acwi_dm_v1 = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
     acwi_dm_v2 = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
-    dm_world_v1 = acwi_dm_v1[acwi_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])]
-    dm_world_v2 = acwi_dm_v2[acwi_dm_v2["Segment"].isin(["Large Cap","Mid Cap"])]
+    dm_world_v1 = dm_post_filter(acwi_dm_v1[acwi_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])])
+    dm_world_v2 = dm_post_filter(acwi_dm_v2[acwi_dm_v2["Segment"].isin(["Large Cap","Mid Cap"])])
 
     # ── EM: compute both methods simultaneously (same for V1 & V2) ───────────
     cutoff_ref = get_dm_cutoff_stock(acwi_dm_v1)
@@ -886,9 +879,9 @@ with tab_acwi_compare:
     em_thr_df, em_min_mcap_cmp = filter_em_by_threshold(df_em, cutoff_mcap_ref, em_threshold_pct)
     em_g85_df = compute_variant1(df_em, large_thr, mid_thr, small_thr)
     em_pc_df  = filter_em_per_country(df_em, pct=mid_thr)
-    em_thr = em_thr_df[em_thr_df["Segment"] == "EM Included"]
-    em_g85 = em_g85_df[em_g85_df["Segment"].isin(["Large Cap","Mid Cap"])]
-    em_pc  = em_pc_df[em_pc_df["Segment"] == "EM Included"]
+    em_thr = em_post_filter(em_thr_df[em_thr_df["Segment"] == "EM Included"])
+    em_g85 = em_post_filter(em_g85_df[em_g85_df["Segment"].isin(["Large Cap","Mid Cap"])])
+    em_pc  = em_post_filter(em_pc_df[em_pc_df["Segment"] == "EM Included"])
 
     # ── EM Info Box ──────────────────────────────────────────────────────────
     if cutoff_ref is not None:
