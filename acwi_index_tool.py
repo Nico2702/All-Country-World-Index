@@ -289,25 +289,26 @@ with st.sidebar:
         try: return max(0, int(str(val).replace(",","").replace(".","").strip()))
         except: return 0
 
-    st.markdown("**DM ADTV (Threshold)**")
-    _dma, _dmb = st.columns([1, 3])
-    with _dma: dm_use_6m  = st.checkbox("6M",  value=False, key="dm_use_6m")
-    with _dmb: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
-    _dmc, _dmd = st.columns([1, 3])
-    with _dmc: dm_use_12m = st.checkbox("12M", value=False, key="dm_use_12m")
-    with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
-    if not dm_use_6m:  dm_min_adtv_6m  = 0
-    if not dm_use_12m: dm_min_adtv_12m = 0
+    with st.expander("ADTV (Threshold)", expanded=False):
+        st.markdown("**DM**")
+        _dma, _dmb = st.columns([1, 3])
+        with _dma: dm_use_6m  = st.checkbox("6M",  value=False, key="dm_use_6m")
+        with _dmb: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
+        _dmc, _dmd = st.columns([1, 3])
+        with _dmc: dm_use_12m = st.checkbox("12M", value=False, key="dm_use_12m")
+        with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
+        if not dm_use_6m:  dm_min_adtv_6m  = 0
+        if not dm_use_12m: dm_min_adtv_12m = 0
 
-    st.markdown("**EM ADTV (Threshold)**")
-    _ema, _emb = st.columns([1, 3])
-    with _ema: em_use_6m  = st.checkbox("6M",  value=False, key="em_use_6m")
-    with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
-    _emc, _emd = st.columns([1, 3])
-    with _emc: em_use_12m = st.checkbox("12M", value=False, key="em_use_12m")
-    with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
-    if not em_use_6m:  em_min_adtv_6m  = 0
-    if not em_use_12m: em_min_adtv_12m = 0
+        st.markdown("**EM**")
+        _ema, _emb = st.columns([1, 3])
+        with _ema: em_use_6m  = st.checkbox("6M",  value=False, key="em_use_6m")
+        with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
+        _emc, _emd = st.columns([1, 3])
+        with _emc: em_use_12m = st.checkbox("12M", value=False, key="em_use_12m")
+        with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
+        if not em_use_6m:  em_min_adtv_6m  = 0
+        if not em_use_12m: em_min_adtv_12m = 0
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
