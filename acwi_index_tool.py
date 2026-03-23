@@ -333,10 +333,9 @@ with st.sidebar:
         if not em_use_12m: em_min_adtv_12m = 0
 
         st.divider()
-        st.markdown("**Liquidity Ratio**")
+        st.markdown("""**Liquidity Ratio** <span title="(12M ADTV / FF MCap) × 252" style="cursor:help;color:#8892b0;font-size:13px;">ⓘ</span>""", unsafe_allow_html=True)
         _lqa, _lqb = st.columns([1, 3])
-        with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio",
-            help="(12M ADTV / FF MCap) × 252")
+        with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio")
         with _lqb:
             liq_ratio_thr = st.text_input("Min. %", value="10", key="liq_ratio_thr",
                 label_visibility="collapsed", disabled=not use_liq_ratio)
