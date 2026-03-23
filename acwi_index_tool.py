@@ -189,15 +189,22 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
-def apply_min_filters(df, ff_gt0=True, min_adtv_6m=0, min_adtv_12m=0):
+def apply_min_filters(df, ff_gt0=True, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
     """Filter out stocks after segment computation.
     ff_gt0: exclude stocks with FF MCap <= 0.
     min_adtv_6m / min_adtv_12m: minimum ADTV in USD. 0 = no filter.
+    min_liq_ratio: minimum (12M ADTV / FF MCap) * 252 in %. 0 = no filter.
     """
     mask = pd.Series(True, index=df.index)
-    if ff_gt0:        mask &= df["Free Float MCap Y2025"] > 0
+    if ff_gt0:           mask &= df["Free Float MCap Y2025"] > 0
     if min_adtv_6m  > 0: mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
     if min_adtv_12m > 0: mask &= df["12M ADTV Y2025"] >= min_adtv_12m
+    if min_liq_ratio > 0:
+        liq = df.apply(
+            lambda r: (r["12M ADTV Y2025"] / r["Free Float MCap Y2025"] * 252 * 100)
+                      if r["Free Float MCap Y2025"] > 0 else 0, axis=1
+        )
+        mask &= liq >= min_liq_ratio
     return df[mask].copy()
 
 
@@ -325,6 +332,17 @@ with st.sidebar:
         if not em_use_6m:  em_min_adtv_6m  = 0
         if not em_use_12m: em_min_adtv_12m = 0
 
+        st.divider()
+        st.markdown("**Liquidity Ratio**")
+        st.caption("(12M ADTV / FF MCap) × 252")
+        _lqa, _lqb = st.columns([1, 3])
+        with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio")
+        with _lqb:
+            liq_ratio_thr = st.text_input("Min. %", value="10", key="liq_ratio_thr",
+                label_visibility="collapsed", disabled=not use_liq_ratio)
+        try:    liq_ratio_min = float(liq_ratio_thr) if use_liq_ratio else 0.0
+        except: liq_ratio_min = 0.0
+
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
 
@@ -355,8 +373,8 @@ df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
 
 # Apply pre-filter if selected (before segment computation)
 if filter_timing.startswith("Pre"):
-    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
-    df_em = apply_min_filters(df_em_full, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
+    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
+    df_em = apply_min_filters(df_em_full, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 else:
     df_dm = df_dm_full.copy()
     df_em = df_em_full.copy()
@@ -366,11 +384,11 @@ _filter_is_pre = filter_timing.startswith("Pre")
 
 def dm_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
+    return apply_min_filters(df, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
 
 def em_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
+    return apply_min_filters(df, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -387,12 +405,13 @@ c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 
 # Show active filter summary (post-segment filters)
 active_filters = []
-if dm_ff_gt0:          active_filters.append("DM FF MCap > 0")
+if dm_ff_gt0:           active_filters.append("DM FF MCap > 0")
 if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,.0f} USD")
 if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,.0f} USD")
-if em_ff_gt0:          active_filters.append("EM FF MCap > 0")
+if em_ff_gt0:           active_filters.append("EM FF MCap > 0")
 if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
 if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,.0f} USD")
+if liq_ratio_min   > 0: active_filters.append(f"Liquidity Ratio ≥ {liq_ratio_min:.1f}%")
 if active_filters:
     timing_label = "vor" if _filter_is_pre else "nach"
     timing_mode  = "Pre" if _filter_is_pre else "Post"
