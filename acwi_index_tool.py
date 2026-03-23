@@ -280,27 +280,28 @@ with st.sidebar:
     st.markdown("### 🔍 Post-Segment Filter")
     st.caption("Werden nach der Segment-Berechnung angewendet.")
 
-    st.markdown("**DM Filter**")
-    dm_ff_gt0 = st.checkbox("DM Free Float MCap > 0", value=True,
-        help="Schließt Aktien mit FF MCap = 0 aus.")
+    ff_gt0 = st.checkbox("Free Float MCap > 0 (DM & EM)", value=True,
+        help="Schließt Aktien mit FF MCap = 0 für DM und EM aus.")
+    dm_ff_gt0 = ff_gt0
+    em_ff_gt0 = ff_gt0
+
+    st.markdown("**DM ADTV**")
     _dm1, _dm2 = st.columns(2)
     with _dm1:
-        dm_min_adtv_6m = st.number_input("6M ADTV (USD)", min_value=0, value=0,
-            step=100000, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="dm_6m")
+        dm_min_adtv_6m = st.number_input("6M", min_value=0, value=0,
+            step=1, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="dm_6m")
     with _dm2:
-        dm_min_adtv_12m = st.number_input("12M ADTV (USD)", min_value=0, value=0,
-            step=100000, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="dm_12m")
+        dm_min_adtv_12m = st.number_input("12M", min_value=0, value=0,
+            step=1, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="dm_12m")
 
-    st.markdown("**EM Filter**")
-    em_ff_gt0 = st.checkbox("EM Free Float MCap > 0", value=True,
-        help="Schließt Aktien mit FF MCap = 0 aus.")
+    st.markdown("**EM ADTV**")
     _em1, _em2 = st.columns(2)
     with _em1:
-        em_min_adtv_6m = st.number_input("6M ADTV (USD)", min_value=0, value=0,
-            step=100000, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="em_6m")
+        em_min_adtv_6m = st.number_input("6M", min_value=0, value=0,
+            step=1, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="em_6m")
     with _em2:
-        em_min_adtv_12m = st.number_input("12M ADTV (USD)", min_value=0, value=0,
-            step=100000, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="em_12m")
+        em_min_adtv_12m = st.number_input("12M", min_value=0, value=0,
+            step=1, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="em_12m")
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
