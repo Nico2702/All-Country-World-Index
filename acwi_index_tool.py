@@ -189,14 +189,15 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
-def apply_min_filters(df, min_ff_mcap_m=0, min_adtv_6m_m=0, min_adtv_12m_m=0):
-    """Filter out stocks below minimum FF MCap or ADTV thresholds.
-    Values are in Mio. USD (millions). 0 = no filter applied.
+def apply_min_filters(df, ff_gt0=True, min_adtv_6m=0, min_adtv_12m=0):
+    """Filter out stocks after segment computation.
+    ff_gt0: exclude stocks with FF MCap <= 0.
+    min_adtv_6m / min_adtv_12m: minimum ADTV in USD. 0 = no filter.
     """
     mask = pd.Series(True, index=df.index)
-    if min_ff_mcap_m  > 0: mask &= df["Free Float MCap Y2025"] >= min_ff_mcap_m  * 1e6
-    if min_adtv_6m_m  > 0: mask &= df["6M ADTV Y2025"]         >= min_adtv_6m_m  * 1e6
-    if min_adtv_12m_m > 0: mask &= df["12M ADTV Y2025"]        >= min_adtv_12m_m * 1e6
+    if ff_gt0:        mask &= df["Free Float MCap Y2025"] > 0
+    if min_adtv_6m  > 0: mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
+    if min_adtv_12m > 0: mask &= df["12M ADTV Y2025"] >= min_adtv_12m
     return df[mask].copy()
 
 
@@ -276,30 +277,30 @@ with st.sidebar:
 
 
     st.markdown("---")
-    st.markdown("### 🔍 Minimum Filters")
-    st.caption("Aktien die einen dieser Werte unterschreiten werden vor der Segment-Berechnung ausgeschlossen.")
+    st.markdown("### 🔍 Post-Segment Filter")
+    st.caption("Werden nach der Segment-Berechnung angewendet.")
 
     st.markdown("**DM Filter**")
-    dm_min_ff_mcap = st.number_input(
-        "DM Min FF MCap (Mio. USD)", min_value=0, value=0, step=50,
-        help="Mindest Free Float MCap in Mio. USD. 0 = kein Filter.")
-    dm_min_adtv_6m = st.number_input(
-        "DM Min 6M ADTV (Mio. USD)", min_value=0, value=0, step=1,
-        help="Mindest 6-Monats ADTV in Mio. USD. 0 = kein Filter.")
-    dm_min_adtv_12m = st.number_input(
-        "DM Min 12M ADTV (Mio. USD)", min_value=0, value=0, step=1,
-        help="Mindest 12-Monats ADTV in Mio. USD. 0 = kein Filter.")
+    dm_ff_gt0 = st.checkbox("DM Free Float MCap > 0", value=True,
+        help="Schließt Aktien mit FF MCap = 0 aus.")
+    _dm1, _dm2 = st.columns(2)
+    with _dm1:
+        dm_min_adtv_6m = st.number_input("6M ADTV (USD)", min_value=0, value=0,
+            step=100000, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="dm_6m")
+    with _dm2:
+        dm_min_adtv_12m = st.number_input("12M ADTV (USD)", min_value=0, value=0,
+            step=100000, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="dm_12m")
 
     st.markdown("**EM Filter**")
-    em_min_ff_mcap = st.number_input(
-        "EM Min FF MCap (Mio. USD)", min_value=0, value=0, step=50,
-        help="Mindest Free Float MCap in Mio. USD. 0 = kein Filter.")
-    em_min_adtv_6m = st.number_input(
-        "EM Min 6M ADTV (Mio. USD)", min_value=0, value=0, step=1,
-        help="Mindest 6-Monats ADTV in Mio. USD. 0 = kein Filter.")
-    em_min_adtv_12m = st.number_input(
-        "EM Min 12M ADTV (Mio. USD)", min_value=0, value=0, step=1,
-        help="Mindest 12-Monats ADTV in Mio. USD. 0 = kein Filter.")
+    em_ff_gt0 = st.checkbox("EM Free Float MCap > 0", value=True,
+        help="Schließt Aktien mit FF MCap = 0 aus.")
+    _em1, _em2 = st.columns(2)
+    with _em1:
+        em_min_adtv_6m = st.number_input("6M ADTV (USD)", min_value=0, value=0,
+            step=100000, format="%d", help="Mindest 6M ADTV in USD. 0 = kein Filter.", key="em_6m")
+    with _em2:
+        em_min_adtv_12m = st.number_input("12M ADTV (USD)", min_value=0, value=0,
+            step=100000, format="%d", help="Mindest 12M ADTV in USD. 0 = kein Filter.", key="em_12m")
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
@@ -320,8 +321,8 @@ df_dm = df_raw[df_raw["Classification"] == "DM"].copy()
 df_em = df_raw[df_raw["Classification"] == "EM"].copy()
 
 # Post-segment filter lambdas — applied AFTER segment computation
-dm_post_filter = lambda df: apply_min_filters(df, dm_min_ff_mcap, dm_min_adtv_6m, dm_min_adtv_12m)
-em_post_filter = lambda df: apply_min_filters(df, em_min_ff_mcap, em_min_adtv_6m, em_min_adtv_12m)
+dm_post_filter = lambda df: apply_min_filters(df, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
+em_post_filter = lambda df: apply_min_filters(df, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -338,16 +339,16 @@ c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 
 # Show active filter summary (post-segment filters)
 active_filters = []
-if dm_min_ff_mcap  > 0: active_filters.append(f"DM FF MCap ≥ {dm_min_ff_mcap:,}M")
-if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,}M")
-if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,}M")
-if em_min_ff_mcap  > 0: active_filters.append(f"EM FF MCap ≥ {em_min_ff_mcap:,}M")
-if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,}M")
-if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,}M")
+if dm_ff_gt0:          active_filters.append("DM FF MCap > 0")
+if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,.0f} USD")
+if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,.0f} USD")
+if em_ff_gt0:          active_filters.append("EM FF MCap > 0")
+if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
+if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,.0f} USD")
 if active_filters:
     st.markdown(f"""<div class="warning-box">
     ⚠️ <b>Aktive Post-Segment Filter:</b> {" &nbsp;|&nbsp; ".join(active_filters)}<br>
-    Filter werden <b>nach</b> der Segment-Berechnung angewendet — Stocks die den Threshold nicht erfüllen werden aus dem finalen Index ausgeschlossen.
+    Filter werden <b>nach</b> der Segment-Berechnung angewendet.
     </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
