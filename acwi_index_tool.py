@@ -277,8 +277,13 @@ with st.sidebar:
 
 
     st.markdown("---")
-    st.markdown("### 🔍 Post-Segment Filter")
-    st.caption("Werden nach der Segment-Berechnung angewendet.")
+    st.markdown("### 🔍 Filter")
+    filter_timing = st.radio(
+        "Filter Zeitpunkt:",
+        ["Post (nach Segment-Berechnung)", "Pre (vor Segment-Berechnung)"],
+        index=0, horizontal=True,
+        help="Post: Filter nach der 85%-Cutoff Berechnung. Pre: Filter vor der Berechnung — beeinflusst die Segment-Zuordnung."
+    )
 
     ff_gt0 = st.checkbox("Free Float MCap > 0 (DM & EM)", value=True,
         help="Schließt Aktien mit FF MCap = 0 für DM und EM aus.")
@@ -325,12 +330,27 @@ else:
 if listing_filter == "Primary only":
     df_raw = df_raw[df_raw["Listing"] == "Primary"].copy()
 
-df_dm = df_raw[df_raw["Classification"] == "DM"].copy()
-df_em = df_raw[df_raw["Classification"] == "EM"].copy()
+df_dm_full = df_raw[df_raw["Classification"] == "DM"].copy()
+df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
+
+# Apply pre-filter if selected (before segment computation)
+if filter_timing.startswith("Pre"):
+    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
+    df_em = apply_min_filters(df_em_full, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
+else:
+    df_dm = df_dm_full.copy()
+    df_em = df_em_full.copy()
 
 # Post-segment filter lambdas — applied AFTER segment computation
-dm_post_filter = lambda df: apply_min_filters(df, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
-em_post_filter = lambda df: apply_min_filters(df, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
+_filter_is_pre = filter_timing.startswith("Pre")
+
+def dm_post_filter(df):
+    if _filter_is_pre: return df  # already applied pre-segment
+    return apply_min_filters(df, dm_ff_gt0, dm_min_adtv_6m, dm_min_adtv_12m)
+
+def em_post_filter(df):
+    if _filter_is_pre: return df  # already applied pre-segment
+    return apply_min_filters(df, em_ff_gt0, em_min_adtv_6m, em_min_adtv_12m)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -354,9 +374,11 @@ if em_ff_gt0:          active_filters.append("EM FF MCap > 0")
 if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
 if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,.0f} USD")
 if active_filters:
+    timing_label = "vor" if _filter_is_pre else "nach"
+    timing_mode  = "Pre" if _filter_is_pre else "Post"
     st.markdown(f"""<div class="warning-box">
-    ⚠️ <b>Aktive Post-Segment Filter:</b> {" &nbsp;|&nbsp; ".join(active_filters)}<br>
-    Filter werden <b>nach</b> der Segment-Berechnung angewendet.
+    ⚠️ <b>Aktive Filter ({timing_mode}):</b> {" &nbsp;|&nbsp; ".join(active_filters)}<br>
+    Filter werden <b>{timing_label}</b> der Segment-Berechnung angewendet.
     </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
