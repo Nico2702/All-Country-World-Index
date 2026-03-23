@@ -249,6 +249,16 @@ def load_excel(file):
     return df
 
 
+@st.cache_data
+def load_classification(path="Country_Classification.xlsx"):
+    try:
+        df = pd.read_excel(path, usecols=["Exchange Country Name", "Classification"])
+        return df.set_index("Exchange Country Name")["Classification"].to_dict()
+    except Exception as e:
+        st.error(f"Country_Classification.xlsx konnte nicht geladen werden: {e}")
+        return {}
+
+
 # ─── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📁 Data Source")
@@ -325,6 +335,16 @@ if uploaded:
 else:
     st.info("👆 Bitte eine Excel-Datei hochladen um zu starten.")
     st.stop()
+
+# ── Apply Country Classification from repo file ──────────────────────────────
+country_cls = load_classification()
+if country_cls:
+    df_raw["Classification"] = df_raw["Exchange Country Name"].map(country_cls)
+    unmatched = df_raw[df_raw["Classification"].isna()]["Exchange Country Name"].unique()
+    if len(unmatched) > 0:
+        st.warning(f"⚠️ {len(unmatched)} Länder nicht in Country_Classification.xlsx gefunden "
+                   f"und werden ignoriert: {', '.join(sorted(unmatched))}")
+    df_raw = df_raw[df_raw["Classification"].notna()].copy()
 
 # Apply listing filter
 if listing_filter == "Primary only":
