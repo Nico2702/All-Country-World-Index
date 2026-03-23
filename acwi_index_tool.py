@@ -292,16 +292,16 @@ with st.sidebar:
     st.markdown("**DM ADTV**")
     _dm1, _dm2 = st.columns(2)
     with _dm1:
-        dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m"))
+        dm_min_adtv_6m  = parse_adtv(st.text_input("6M (Threshold)", value="0", key="dm_6m"))
     with _dm2:
-        dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="dm_12m"))
+        dm_min_adtv_12m = parse_adtv(st.text_input("12M (Threshold)", value="0", key="dm_12m"))
 
     st.markdown("**EM ADTV**")
     _em1, _em2 = st.columns(2)
     with _em1:
-        em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="em_6m"))
+        em_min_adtv_6m  = parse_adtv(st.text_input("6M (Threshold)", value="0", key="em_6m"))
     with _em2:
-        em_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="em_12m"))
+        em_min_adtv_12m = parse_adtv(st.text_input("12M (Threshold)", value="0", key="em_12m"))
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
