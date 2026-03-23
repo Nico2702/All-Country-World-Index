@@ -334,9 +334,9 @@ with st.sidebar:
 
         st.divider()
         st.markdown("**Liquidity Ratio**")
-        st.caption("(12M ADTV / FF MCap) × 252")
         _lqa, _lqb = st.columns([1, 3])
-        with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio")
+        with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio",
+            help="(12M ADTV / FF MCap) × 252")
         with _lqb:
             liq_ratio_thr = st.text_input("Min. %", value="10", key="liq_ratio_thr",
                 label_visibility="collapsed", disabled=not use_liq_ratio)
