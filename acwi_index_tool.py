@@ -271,6 +271,20 @@ def add_ff_weight(df):
     return df
 
 
+def add_adjusted_weight(df, china_factor=0.20):
+    """Add Adjusted Weight (%) column applying inclusion factor for China A-Shares.
+    Shanghai & Shenzhen stocks get FF MCap * china_factor, all others * 1.0.
+    """
+    df = df.copy()
+    is_china_a = df["Exchange Name"].isin(["SHANGHAI", "SHENZHEN"])
+    df["Inclusion Factor"] = 1.0
+    df.loc[is_china_a, "Inclusion Factor"] = china_factor
+    df["Adjusted FF MCap"] = df["Free Float MCap Y2025"] * df["Inclusion Factor"]
+    total_adj = df["Adjusted FF MCap"].sum()
+    df["Adjusted Weight (%)"] = (df["Adjusted FF MCap"] / total_adj * 100) if total_adj > 0 else 0.0
+    return df
+
+
 def segment_summary(df_seg):
     mask = df_seg["Segment"] != "Micro / Excluded"
     segments = ["Large Cap", "Mid Cap", "Small Cap"]
@@ -466,6 +480,19 @@ with st.sidebar:
                 label_visibility="collapsed", disabled=not use_liq_ratio)
         try:    liq_ratio_min = float(liq_ratio_thr) if use_liq_ratio else 0.0
         except: liq_ratio_min = 0.0
+
+    st.markdown("---")
+    st.markdown("### ⚖️ Weighting")
+    with st.expander("Inclusion Factors", expanded=False):
+        st.markdown("""**China A-Shares** <span title="Gilt für Shanghai & Shenzhen. Adjusted FF MCap = FF MCap × Factor. Adjusted Weight = Adjusted FF MCap / Σ Adjusted FF MCap aller Index-Stocks." style="cursor:help;color:#8892b0;font-size:13px;">ⓘ</span>""", unsafe_allow_html=True)
+        _cna, _cnb = st.columns([3, 4])
+        with _cna:
+            use_china_factor = st.checkbox("aktiv", value=True, key="use_china_factor")
+        with _cnb:
+            china_factor_raw = st.text_input("China Factor", value="20", key="china_factor_input",
+                label_visibility="collapsed", disabled=not use_china_factor)
+        try:    china_inclusion_factor = float(china_factor_raw) / 100 if use_china_factor else 1.0
+        except: china_inclusion_factor = 0.20
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
@@ -777,7 +804,7 @@ with tab_v1:
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
     _drop = ["cum_ff"]
     _v1_universe = export_v1.drop(columns=_drop, errors="ignore")
-    _v1_world    = add_ff_weight(_v1_universe[(_v1_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v1_universe["Status"]=="Included")])
+    _v1_world    = add_adjusted_weight(add_ff_weight(_v1_universe[(_v1_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v1_universe["Status"]=="Included")]), china_inclusion_factor)
     st.download_button(
         "⬇️ Download Variant 1 as Excel",
         data=to_excel_multi({"Universe": _v1_universe, "World Index (DM)": _v1_world}),
@@ -876,7 +903,7 @@ with tab_v2:
     export_v2 = build_full_export(df_v2, "DM", dm_post_filter, _fp_dm2)
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
     _v2_universe = export_v2.drop(columns=["cum_ff"], errors="ignore")
-    _v2_world    = add_ff_weight(_v2_universe[(_v2_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v2_universe["Status"]=="Included")])
+    _v2_world    = add_adjusted_weight(add_ff_weight(_v2_universe[(_v2_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v2_universe["Status"]=="Included")]), china_inclusion_factor)
     st.download_button(
         "⬇️ Download Variant 2 as Excel",
         data=to_excel_multi({"Universe": _v2_universe, "World Index (DM)": _v2_world}),
@@ -1069,15 +1096,15 @@ with tab_acwi:
     export_em_acwi = build_full_export(df_em_result, "EM", em_post_filter, _fp_em_acwi)
     _acwi_universe = pd.concat([export_dm_acwi, export_em_acwi], ignore_index=True)
     _acwi_universe = _acwi_universe[[c for c in _acwi_universe.columns if c not in ["cum_ff"]]]
-    _acwi_world = add_ff_weight(_acwi_universe[
+    _acwi_world = add_adjusted_weight(add_ff_weight(_acwi_universe[
         (_acwi_universe["Classification"] == "DM") &
         (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap"])) &
         (_acwi_universe["Status"] == "Included")
-    ])
-    _acwi_index = add_ff_weight(_acwi_universe[
+    ]), china_inclusion_factor)
+    _acwi_index = add_adjusted_weight(add_ff_weight(_acwi_universe[
         (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap","EM Included"])) &
         (_acwi_universe["Status"] == "Included")
-    ])
+    ]), china_inclusion_factor)
     st.download_button(
         "⬇️ Download ACWI as Excel",
         data=to_excel_multi({
