@@ -349,6 +349,8 @@ with st.sidebar:
     st.markdown("### ⚙️ Index Parameters")
 
     listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
+    exclude_hk_cny = st.checkbox("Exclude Hong Kong (CNY)", value=True,
+        help="Schließt alle Aktien aus, wo Exchange Ticker = HKG und Trading Currency = CNY.")
 
     st.markdown("**DM Percentile Thresholds**")
     _la, _lb = st.columns([3, 4])
@@ -489,6 +491,11 @@ if country_cls:
 # Apply listing filter
 if listing_filter == "Primary only":
     df_raw = df_raw[df_raw["Listing"] == "Primary"].copy()
+
+# Exclude Hong Kong CNY stocks (Exchange Ticker contains HKG and Trading Currency = CNY)
+if exclude_hk_cny:
+    hk_cny_mask = (df_raw["Exchange Ticker"].str.contains("HKG", na=False)) &                   (df_raw["Trading Currency"] == "CNY")
+    df_raw = df_raw[~hk_cny_mask].copy()
 
 df_dm_full = df_raw[df_raw["Classification"] == "DM"].copy()
 df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
