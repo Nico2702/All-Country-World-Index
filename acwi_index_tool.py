@@ -348,11 +348,12 @@ with st.sidebar:
 
         st.divider()
         st.markdown("""**Liquidity Ratio** <span title="(12M ADTV / FF MCap) × 252" style="cursor:help;color:#8892b0;font-size:13px;">ⓘ</span>""", unsafe_allow_html=True)
-        _lqa, _lqb = st.columns([3, 4])
+        _lqa, _lqb, _lqc = st.columns([3, 4, 1])
         with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio")
         with _lqb:
             liq_ratio_thr = st.text_input("Min. %", value="10", key="liq_ratio_thr",
                 label_visibility="collapsed", disabled=not use_liq_ratio)
+        with _lqc: st.markdown("<div style='padding-top:8px;color:#e8eaf6;'>%</div>", unsafe_allow_html=True)
         try:    liq_ratio_min = float(liq_ratio_thr) if use_liq_ratio else 0.0
         except: liq_ratio_min = 0.0
 
