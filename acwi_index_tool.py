@@ -343,20 +343,33 @@ with st.sidebar:
     listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
 
     st.markdown("**DM Percentile Thresholds**")
-    large_thr = st.slider("Large Cap cutoff (%)", 50, 80, 70, 1,
-        help="Cumulative FF MCap threshold for Large Cap inclusion")
-    mid_thr   = st.slider("Mid Cap cutoff (%)",   large_thr+1, 95, 85, 1,
-        help="Cumulative FF MCap threshold for Mid Cap inclusion (= World Index boundary)")
-    small_thr = st.slider("Small Cap cutoff (%)", mid_thr+1, 100, 99, 1,
-        help="Cumulative FF MCap threshold for Small Cap inclusion")
+    _la, _lb = st.columns([3, 4])
+    with _la: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Large Cap (%)</div>", unsafe_allow_html=True)
+    with _lb:
+        _large_raw = st.text_input("Large Cap", value="70", key="large_thr_input", label_visibility="collapsed")
+    _ma, _mb = st.columns([3, 4])
+    with _ma: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Mid Cap (%)</div>", unsafe_allow_html=True)
+    with _mb:
+        _mid_raw = st.text_input("Mid Cap", value="85", key="mid_thr_input", label_visibility="collapsed")
+    _sa, _sb = st.columns([3, 4])
+    with _sa: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Small Cap (%)</div>", unsafe_allow_html=True)
+    with _sb:
+        _small_raw = st.text_input("Small Cap", value="99", key="small_thr_input", label_visibility="collapsed")
+    try:    large_thr = int(_large_raw)
+    except: large_thr = 70
+    try:    mid_thr   = int(_mid_raw)
+    except: mid_thr   = 85
+    try:    small_thr = int(_small_raw)
+    except: small_thr = 99
 
     st.markdown("**EM Parameters (ACWI Threshold)**")
     st.caption("EM-Aktien müssen mindestens X% des Total MCap des letzten DM-Grenzstocks (85%-Cutoff) erreichen.")
-    em_threshold_pct = st.slider(
-        "EM Min MCap (% des DM Cutoff-Stocks)",
-        min_value=1, max_value=200, value=50, step=1,
-        help="EM Total MCap ≥ X% × Total MCap des letzten DM-Stocks im World Index"
-    )
+    _ema, _emb = st.columns([3, 4])
+    with _ema: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min MCap (%)</div>", unsafe_allow_html=True)
+    with _emb:
+        _em_thr_raw = st.text_input("EM Min MCap", value="33", key="em_threshold_input", label_visibility="collapsed")
+    try:    em_threshold_pct = int(_em_thr_raw)
+    except: em_threshold_pct = 33
 
 
     st.markdown("---")
