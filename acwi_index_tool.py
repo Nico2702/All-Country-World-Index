@@ -267,7 +267,7 @@ def add_ff_weight(df):
     """Add FF MCap Weight (%) column based on Free Float MCap."""
     df = df.copy()
     total = df["Free Float MCap Y2025"].sum()
-    df["FF MCap Weight (%)"] = (df["Free Float MCap Y2025"] / total * 100).round(4) if total > 0 else 0.0
+    df["FF MCap Weight (%)"] = (df["Free Float MCap Y2025"] / total * 100) if total > 0 else 0.0
     return df
 
 
