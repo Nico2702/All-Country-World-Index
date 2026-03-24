@@ -292,6 +292,15 @@ def to_excel_download(df, sheet_name="Index"):
     return buf.getvalue()
 
 
+def to_excel_multi(sheets: dict):
+    """Export multiple DataFrames as sheets. sheets = {sheet_name: df}"""
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+    return buf.getvalue()
+
+
 SEGMENT_COLORS = {
     "Large Cap": "#2979ff",
     "Mid Cap":   "#00e676",
@@ -671,9 +680,12 @@ with tab_v1:
         min_adtv_6m=dm_min_adtv_6m, min_adtv_12m=dm_min_adtv_12m, min_liq_ratio=liq_ratio_min)
     export_v1 = build_full_export(df_v1, "DM", dm_post_filter, _fp_dm)
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
+    _drop = ["cum_ff"]
+    _v1_universe = export_v1.drop(columns=_drop, errors="ignore")
+    _v1_world    = _v1_universe[(_v1_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v1_universe["Status"]=="Included")]
     st.download_button(
-        "⬇️ Download Full Universe (Variant 1) as Excel",
-        data=to_excel_download(export_v1.drop(columns=["cum_ff"], errors="ignore"), "World_V1"),
+        "⬇️ Download Variant 1 as Excel",
+        data=to_excel_multi({"Universe": _v1_universe, "World Index (DM)": _v1_world}),
         file_name="NaroIX_World_Variant1.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -768,9 +780,11 @@ with tab_v2:
         min_adtv_6m=dm_min_adtv_6m, min_adtv_12m=dm_min_adtv_12m, min_liq_ratio=liq_ratio_min)
     export_v2 = build_full_export(df_v2, "DM", dm_post_filter, _fp_dm2)
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
+    _v2_universe = export_v2.drop(columns=["cum_ff"], errors="ignore")
+    _v2_world    = _v2_universe[(_v2_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v2_universe["Status"]=="Included")]
     st.download_button(
-        "⬇️ Download Full Universe (Variant 2) as Excel",
-        data=to_excel_download(export_v2.drop(columns=["cum_ff"], errors="ignore"), "World_V2"),
+        "⬇️ Download Variant 2 as Excel",
+        data=to_excel_multi({"Universe": _v2_universe, "World Index (DM)": _v2_world}),
         file_name="NaroIX_World_Variant2.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -956,13 +970,26 @@ with tab_acwi:
     _fp_em_acwi = dict(ff_gt0=em_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
         min_adtv_1m=em_min_adtv_1m, min_adtv_3m=em_min_adtv_3m,
         min_adtv_6m=em_min_adtv_6m, min_adtv_12m=em_min_adtv_12m, min_liq_ratio=liq_ratio_min)
-    export_dm = build_full_export(df_dm_seg, "DM", dm_post_filter, _fp_dm_acwi)
-    export_em = build_full_export(df_em_result if "df_em_result" in dir() else df_em, "EM", em_post_filter, _fp_em_acwi)
-    df_acwi_export = pd.concat([export_dm, export_em], ignore_index=True)
+    export_dm_acwi = build_full_export(df_dm_seg, "DM", dm_post_filter, _fp_dm_acwi)
+    export_em_acwi = build_full_export(df_em_result, "EM", em_post_filter, _fp_em_acwi)
+    _acwi_universe = pd.concat([export_dm_acwi, export_em_acwi], ignore_index=True)
+    _acwi_universe = _acwi_universe[[c for c in _acwi_universe.columns if c not in ["cum_ff"]]]
+    _acwi_world = _acwi_universe[
+        (_acwi_universe["Classification"] == "DM") &
+        (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap"])) &
+        (_acwi_universe["Status"] == "Included")
+    ]
+    _acwi_index = _acwi_universe[
+        (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap","EM Included"])) &
+        (_acwi_universe["Status"] == "Included")
+    ]
     st.download_button(
-        "⬇️ Download Full ACWI Universe as Excel",
-        data=to_excel_download(
-            df_acwi_export[[c for c in df_acwi_export.columns if c not in ["cum_ff"]]], "ACWI"),
+        "⬇️ Download ACWI as Excel",
+        data=to_excel_multi({
+            "Universe":         _acwi_universe,
+            "World Index (DM)": _acwi_world,
+            "ACWI Index":       _acwi_index,
+        }),
         file_name="NaroIX_ACWI.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
