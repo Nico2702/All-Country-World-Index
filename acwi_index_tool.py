@@ -669,7 +669,7 @@ with tab_overview:
         })
 
     _sens_df = pd.DataFrame(_sens_rows)
-    st.dataframe(_sens_df, use_container_width=True, hide_index=True)
+    st.dataframe(_sens_df, use_container_width=True, hide_index=True, height=575)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
