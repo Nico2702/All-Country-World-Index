@@ -340,7 +340,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### ⚙️ Index Parameters")
 
-    listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=0)
+    listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
 
     st.markdown("**DM Percentile Thresholds**")
     large_thr = st.slider("Large Cap cutoff (%)", 50, 80, 70, 1,
