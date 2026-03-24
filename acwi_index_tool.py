@@ -326,16 +326,16 @@ with st.sidebar:
         st.markdown("**Developed Markets (DM)**")
         _dma, _dmb = st.columns([3, 4])
         with _dma: dm_use_1m  = st.checkbox("1M",  value=True, key="dm_use_1m")
-        with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="0", key="dm_1m", label_visibility="collapsed", value="1500000", disabled=not dm_use_1m))
+        with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="1500000", key="dm_1m", label_visibility="collapsed", disabled=not dm_use_1m))
         _dme, _dmf = st.columns([3, 4])
         with _dme: dm_use_3m  = st.checkbox("3M",  value=True, key="dm_use_3m")
-        with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="0", key="dm_3m", label_visibility="collapsed", value="1500000", disabled=not dm_use_3m))
+        with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="1500000", key="dm_3m", label_visibility="collapsed", disabled=not dm_use_3m))
         _dma2, _dmb2 = st.columns([3, 4])
         with _dma2: dm_use_6m  = st.checkbox("6M",  value=True, key="dm_use_6m")
-        with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m", label_visibility="collapsed", value="1500000",  disabled=not dm_use_6m))
+        with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="1500000", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
         _dmc, _dmd = st.columns([3, 4])
         with _dmc: dm_use_12m = st.checkbox("12M", value=True, key="dm_use_12m")
-        with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="dm_12m", label_visibility="collapsed", value="1500000", disabled=not dm_use_12m))
+        with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="1500000", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
         if not dm_use_1m:  dm_min_adtv_1m  = 0
         if not dm_use_3m:  dm_min_adtv_3m  = 0
         if not dm_use_6m:  dm_min_adtv_6m  = 0
@@ -344,16 +344,16 @@ with st.sidebar:
         st.markdown("**Emerging Markets (EM)**")
         _ema0, _emb0 = st.columns([3, 4])
         with _ema0: em_use_1m  = st.checkbox("1M",  value=True, key="em_use_1m")
-        with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="0", key="em_1m", label_visibility="collapsed", value="750000", disabled=not em_use_1m))
+        with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="750000", key="em_1m", label_visibility="collapsed", disabled=not em_use_1m))
         _eme, _emf = st.columns([3, 4])
         with _eme: em_use_3m  = st.checkbox("3M",  value=True, key="em_use_3m")
-        with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="0", key="em_3m", label_visibility="collapsed", value="750000", disabled=not em_use_3m))
+        with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="750000", key="em_3m", label_visibility="collapsed", disabled=not em_use_3m))
         _ema, _emb = st.columns([3, 4])
         with _ema: em_use_6m  = st.checkbox("6M",  value=True, key="em_use_6m")
-        with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="em_6m", label_visibility="collapsed", value="750000",  disabled=not em_use_6m))
+        with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="750000", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
         _emc, _emd = st.columns([3, 4])
         with _emc: em_use_12m = st.checkbox("12M", value=True, key="em_use_12m")
-        with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="em_12m", label_visibility="collapsed", value="750000", disabled=not em_use_12m))
+        with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="750000", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
         if not em_use_1m:  em_min_adtv_1m  = 0
         if not em_use_3m:  em_min_adtv_3m  = 0
         if not em_use_6m:  em_min_adtv_6m  = 0
