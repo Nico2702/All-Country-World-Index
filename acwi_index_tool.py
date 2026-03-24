@@ -189,6 +189,37 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
+def get_exclusion_reasons(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None,
+                           min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0,
+                           min_liq_ratio=0.0):
+    """Return a Series of exclusion reason strings per stock. Empty string = included."""
+    liq = df.apply(
+        lambda r: (r["12M ADTV Y2025"] / r["Free Float MCap Y2025"] * 252 * 100)
+                  if r["Free Float MCap Y2025"] > 0 else 0, axis=1
+    )
+    reasons = []
+    for idx, row in df.iterrows():
+        r = []
+        if ff_gt0 and row["Free Float MCap Y2025"] <= 0:
+            r.append("FF MCap = 0")
+        if min_ff_pct > 0 and row["Free Float Percent"] < min_ff_pct:
+            r.append(f"FF% < {min_ff_pct*100:.0f}%")
+        if max_closing_price is not None and row["Closing Price"] > max_closing_price:
+            r.append(f"Price > {max_closing_price:,.0f}")
+        if min_adtv_1m  > 0 and row["1M ADTV Y2025"]  < min_adtv_1m:
+            r.append(f"1M ADTV < {min_adtv_1m:,.0f}")
+        if min_adtv_3m  > 0 and row["3M ADTV Y2025"]  < min_adtv_3m:
+            r.append(f"3M ADTV < {min_adtv_3m:,.0f}")
+        if min_adtv_6m  > 0 and row["6M ADTV Y2025"]  < min_adtv_6m:
+            r.append(f"6M ADTV < {min_adtv_6m:,.0f}")
+        if min_adtv_12m > 0 and row["12M ADTV Y2025"] < min_adtv_12m:
+            r.append(f"12M ADTV < {min_adtv_12m:,.0f}")
+        if min_liq_ratio > 0 and liq[idx] < min_liq_ratio:
+            r.append(f"Liq. Ratio < {min_liq_ratio:.1f}%")
+        reasons.append(" | ".join(r))
+    return pd.Series(reasons, index=df.index)
+
+
 def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None, min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
     """Filter out stocks after segment computation."""
     mask = pd.Series(True, index=df.index)
@@ -206,6 +237,30 @@ def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None, m
         )
         mask &= liq >= min_liq_ratio
     return df[mask].copy()
+
+
+def build_full_export(df_seg, classification, post_filter_fn, filter_params):
+    """Build full universe export with Segment + Status + Exclusion Reason columns."""
+    df = df_seg.copy()
+    df["Classification"] = classification
+
+    # Compute exclusion reasons for ALL stocks in the segmented universe
+    reasons = get_exclusion_reasons(df, **filter_params)
+    df["Exclusion Reason"] = reasons
+
+    # Status: Included if has a real segment AND passes filters
+    included_mask = (
+        df["Segment"].isin(["Large Cap", "Mid Cap", "Small Cap", "EM Included"]) &
+        (df["Exclusion Reason"] == "")
+    )
+    df["Status"] = np.where(included_mask, "Included", "Excluded")
+    df.loc[df["Exclusion Reason"] == "", "Exclusion Reason"] = np.where(
+        df.loc[df["Exclusion Reason"] == "", "Segment"].isin(
+            ["Micro / Excluded", "EM Excluded", "Other"]
+        ), "Below Segment Cutoff", ""
+    )
+    df.loc[(df["Status"] == "Included"), "Exclusion Reason"] = ""
+    return df
 
 
 def segment_summary(df_seg):
@@ -611,11 +666,14 @@ with tab_v1:
     st.dataframe(world_country.drop(columns="FF_MCap"), use_container_width=True, hide_index=True)
 
     # Download
-    export_v1 = dm_post_filter(df_v1[df_v1["Segment"] != "Micro / Excluded"]).copy()
+    _fp_dm = dict(ff_gt0=dm_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
+        min_adtv_1m=dm_min_adtv_1m, min_adtv_3m=dm_min_adtv_3m,
+        min_adtv_6m=dm_min_adtv_6m, min_adtv_12m=dm_min_adtv_12m, min_liq_ratio=liq_ratio_min)
+    export_v1 = build_full_export(df_v1, "DM", dm_post_filter, _fp_dm)
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
     st.download_button(
-        "⬇️ Download World Index (Variant 1) as Excel",
-        data=to_excel_download(export_v1.drop(columns=["cum_ff"]), "World_V1"),
+        "⬇️ Download Full Universe (Variant 1) as Excel",
+        data=to_excel_download(export_v1.drop(columns=["cum_ff"], errors="ignore"), "World_V1"),
         file_name="NaroIX_World_Variant1.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -705,11 +763,14 @@ with tab_v2:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    export_v2 = dm_post_filter(df_v2[df_v2["Segment"] != "Micro / Excluded"]).copy()
+    _fp_dm2 = dict(ff_gt0=dm_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
+        min_adtv_1m=dm_min_adtv_1m, min_adtv_3m=dm_min_adtv_3m,
+        min_adtv_6m=dm_min_adtv_6m, min_adtv_12m=dm_min_adtv_12m, min_liq_ratio=liq_ratio_min)
+    export_v2 = build_full_export(df_v2, "DM", dm_post_filter, _fp_dm2)
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
     st.download_button(
-        "⬇️ Download World Index (Variant 2) as Excel",
-        data=to_excel_download(export_v2.drop(columns=["cum_ff"]), "World_V2"),
+        "⬇️ Download Full Universe (Variant 2) as Excel",
+        data=to_excel_download(export_v2.drop(columns=["cum_ff"], errors="ignore"), "World_V2"),
         file_name="NaroIX_World_Variant2.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -889,9 +950,17 @@ with tab_acwi:
     st.plotly_chart(fig_acwi, use_container_width=True)
 
     # ── Download ─────────────────────────────────────────────────────────────
-    df_acwi_export = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
+    _fp_dm_acwi = dict(ff_gt0=dm_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
+        min_adtv_1m=dm_min_adtv_1m, min_adtv_3m=dm_min_adtv_3m,
+        min_adtv_6m=dm_min_adtv_6m, min_adtv_12m=dm_min_adtv_12m, min_liq_ratio=liq_ratio_min)
+    _fp_em_acwi = dict(ff_gt0=em_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
+        min_adtv_1m=em_min_adtv_1m, min_adtv_3m=em_min_adtv_3m,
+        min_adtv_6m=em_min_adtv_6m, min_adtv_12m=em_min_adtv_12m, min_liq_ratio=liq_ratio_min)
+    export_dm = build_full_export(df_dm_seg, "DM", dm_post_filter, _fp_dm_acwi)
+    export_em = build_full_export(df_em_result if "df_em_result" in dir() else df_em, "EM", em_post_filter, _fp_em_acwi)
+    df_acwi_export = pd.concat([export_dm, export_em], ignore_index=True)
     st.download_button(
-        "⬇️ Download Full ACWI Constituents as Excel",
+        "⬇️ Download Full ACWI Universe as Excel",
         data=to_excel_download(
             df_acwi_export[[c for c in df_acwi_export.columns if c not in ["cum_ff"]]], "ACWI"),
         file_name="NaroIX_ACWI.xlsx",
