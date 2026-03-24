@@ -311,7 +311,7 @@ with st.sidebar:
     dm_ff_gt0 = ff_gt0
     em_ff_gt0 = ff_gt0
 
-    _ffa, _gap, _ffb = st.columns([2, 1, 4])
+    _ffa, _ffb = st.columns([3, 4])
     with _ffa:
         use_ff_pct = st.checkbox("FF% ≥", value=True, key="use_ff_pct",
             help="Schließt Aktien aus deren Free Float Percent unter dem Threshold liegt.")
