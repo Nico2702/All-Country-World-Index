@@ -189,11 +189,12 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
-def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
+def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None, min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
     """Filter out stocks after segment computation."""
     mask = pd.Series(True, index=df.index)
-    if ff_gt0:            mask &= df["Free Float MCap Y2025"] > 0
-    if min_ff_pct  > 0:   mask &= df["Free Float Percent"] >= min_ff_pct
+    if ff_gt0:                         mask &= df["Free Float MCap Y2025"] > 0
+    if min_ff_pct  > 0:                mask &= df["Free Float Percent"] >= min_ff_pct
+    if max_closing_price is not None:  mask &= df["Closing Price"] <= max_closing_price
     if min_adtv_1m  > 0:  mask &= df["1M ADTV Y2025"]  >= min_adtv_1m
     if min_adtv_3m  > 0:  mask &= df["3M ADTV Y2025"]  >= min_adtv_3m
     if min_adtv_6m  > 0:  mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
@@ -318,6 +319,16 @@ with st.sidebar:
     try:    min_ff_pct = float(ff_pct_thr) / 100 if use_ff_pct else 0.0
     except: min_ff_pct = 0.0
 
+    _cpa, _cpb = st.columns([3, 4])
+    with _cpa:
+        use_max_price = st.checkbox("Price ≤", value=True, key="use_max_price",
+            help="Schließt Aktien aus deren Closing Price über dem Threshold liegt.")
+    with _cpb:
+        max_price_thr = st.text_input("Max Price", value="15,000", key="max_price_thr",
+            label_visibility="collapsed", disabled=not use_max_price)
+    try:    max_closing_price = float(max_price_thr.replace(",","")) if use_max_price else None
+    except: max_closing_price = None
+
     def parse_adtv(val):
         try: return max(0, int(str(val).replace(",","").replace(".","").strip()))
         except: return 0
@@ -399,8 +410,8 @@ df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
 
 # Apply pre-filter if selected (before segment computation)
 if filter_timing.startswith("Pre"):
-    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, min_ff_pct, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
-    df_em = apply_min_filters(df_em_full, em_ff_gt0, min_ff_pct, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
+    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, min_ff_pct, max_closing_price, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
+    df_em = apply_min_filters(df_em_full, em_ff_gt0, min_ff_pct, max_closing_price, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 else:
     df_dm = df_dm_full.copy()
     df_em = df_em_full.copy()
@@ -410,11 +421,11 @@ _filter_is_pre = filter_timing.startswith("Pre")
 
 def dm_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, dm_ff_gt0, min_ff_pct, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
+    return apply_min_filters(df, dm_ff_gt0, min_ff_pct, max_closing_price, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
 
 def em_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, em_ff_gt0, min_ff_pct, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
+    return apply_min_filters(df, em_ff_gt0, min_ff_pct, max_closing_price, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -442,6 +453,7 @@ if em_min_adtv_3m  > 0: active_filters.append(f"EM 3M ADTV ≥ {em_min_adtv_3m:,
 if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
 if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,.0f} USD")
 if min_ff_pct      > 0: active_filters.append(f"FF% ≥ {min_ff_pct*100:.1f}%")
+if max_closing_price is not None: active_filters.append(f"Closing Price ≤ {max_closing_price:,.0f}")
 if liq_ratio_min   > 0: active_filters.append(f"Liquidity Ratio ≥ {liq_ratio_min:.1f}%")
 if active_filters:
     timing_label = "vor" if _filter_is_pre else "nach"
