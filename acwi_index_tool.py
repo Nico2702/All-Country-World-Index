@@ -367,9 +367,9 @@ with st.sidebar:
     _ema, _emb = st.columns([3, 4])
     with _ema: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min MCap (%)</div>", unsafe_allow_html=True)
     with _emb:
-        _em_thr_raw = st.text_input("EM Min MCap", value="33", key="em_threshold_input", label_visibility="collapsed")
-    try:    em_threshold_pct = int(_em_thr_raw)
-    except: em_threshold_pct = 33
+        _em_thr_raw = st.text_input("EM Min MCap", value="33.3", key="em_threshold_input", label_visibility="collapsed")
+    try:    em_threshold_pct = float(_em_thr_raw)
+    except: em_threshold_pct = 33.3
 
 
     st.markdown("---")
