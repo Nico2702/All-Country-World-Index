@@ -189,18 +189,15 @@ def filter_em_per_country(df_em, pct=85):
     return pd.concat(results, ignore_index=True)
 
 
-def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
-    """Filter out stocks after segment computation.
-    ff_gt0: exclude stocks with FF MCap <= 0.
-    min_ff_pct: minimum Free Float Percent (0–1). 0 = no filter.
-    min_adtv_6m / min_adtv_12m: minimum ADTV in USD. 0 = no filter.
-    min_liq_ratio: minimum (12M ADTV / FF MCap) * 252 in %. 0 = no filter.
-    """
+def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
+    """Filter out stocks after segment computation."""
     mask = pd.Series(True, index=df.index)
-    if ff_gt0:           mask &= df["Free Float MCap Y2025"] > 0
-    if min_ff_pct  > 0:  mask &= df["Free Float Percent"] >= min_ff_pct
-    if min_adtv_6m  > 0: mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
-    if min_adtv_12m > 0: mask &= df["12M ADTV Y2025"] >= min_adtv_12m
+    if ff_gt0:            mask &= df["Free Float MCap Y2025"] > 0
+    if min_ff_pct  > 0:   mask &= df["Free Float Percent"] >= min_ff_pct
+    if min_adtv_1m  > 0:  mask &= df["1M ADTV Y2025"]  >= min_adtv_1m
+    if min_adtv_3m  > 0:  mask &= df["3M ADTV Y2025"]  >= min_adtv_3m
+    if min_adtv_6m  > 0:  mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
+    if min_adtv_12m > 0:  mask &= df["12M ADTV Y2025"] >= min_adtv_12m
     if min_liq_ratio > 0:
         liq = df.apply(
             lambda r: (r["12M ADTV Y2025"] / r["Free Float MCap Y2025"] * 252 * 100)
@@ -326,23 +323,39 @@ with st.sidebar:
         except: return 0
 
     with st.expander("ADTV (Threshold)", expanded=False):
-        st.markdown("**DM**")
+        st.markdown("**Developed Markets (DM)**")
         _dma, _dmb = st.columns([3, 4])
-        with _dma: dm_use_6m  = st.checkbox("6M",  value=False, key="dm_use_6m")
-        with _dmb: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
+        with _dma: dm_use_1m  = st.checkbox("1M",  value=False, key="dm_use_1m")
+        with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="0", key="dm_1m",  label_visibility="collapsed", disabled=not dm_use_1m))
+        _dme, _dmf = st.columns([3, 4])
+        with _dme: dm_use_3m  = st.checkbox("3M",  value=False, key="dm_use_3m")
+        with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="0", key="dm_3m",  label_visibility="collapsed", disabled=not dm_use_3m))
+        _dma2, _dmb2 = st.columns([3, 4])
+        with _dma2: dm_use_6m  = st.checkbox("6M",  value=False, key="dm_use_6m")
+        with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
         _dmc, _dmd = st.columns([3, 4])
         with _dmc: dm_use_12m = st.checkbox("12M", value=False, key="dm_use_12m")
         with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
+        if not dm_use_1m:  dm_min_adtv_1m  = 0
+        if not dm_use_3m:  dm_min_adtv_3m  = 0
         if not dm_use_6m:  dm_min_adtv_6m  = 0
         if not dm_use_12m: dm_min_adtv_12m = 0
 
-        st.markdown("**EM**")
+        st.markdown("**Emerging Markets (EM)**")
+        _ema0, _emb0 = st.columns([3, 4])
+        with _ema0: em_use_1m  = st.checkbox("1M",  value=False, key="em_use_1m")
+        with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="0", key="em_1m",  label_visibility="collapsed", disabled=not em_use_1m))
+        _eme, _emf = st.columns([3, 4])
+        with _eme: em_use_3m  = st.checkbox("3M",  value=False, key="em_use_3m")
+        with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="0", key="em_3m",  label_visibility="collapsed", disabled=not em_use_3m))
         _ema, _emb = st.columns([3, 4])
         with _ema: em_use_6m  = st.checkbox("6M",  value=False, key="em_use_6m")
         with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="0", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
         _emc, _emd = st.columns([3, 4])
         with _emc: em_use_12m = st.checkbox("12M", value=False, key="em_use_12m")
         with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="0", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
+        if not em_use_1m:  em_min_adtv_1m  = 0
+        if not em_use_3m:  em_min_adtv_3m  = 0
         if not em_use_6m:  em_min_adtv_6m  = 0
         if not em_use_12m: em_min_adtv_12m = 0
 
@@ -386,8 +399,8 @@ df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
 
 # Apply pre-filter if selected (before segment computation)
 if filter_timing.startswith("Pre"):
-    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, min_ff_pct, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
-    df_em = apply_min_filters(df_em_full, em_ff_gt0, min_ff_pct, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
+    df_dm = apply_min_filters(df_dm_full, dm_ff_gt0, min_ff_pct, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
+    df_em = apply_min_filters(df_em_full, em_ff_gt0, min_ff_pct, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 else:
     df_dm = df_dm_full.copy()
     df_em = df_em_full.copy()
@@ -397,11 +410,11 @@ _filter_is_pre = filter_timing.startswith("Pre")
 
 def dm_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, dm_ff_gt0, min_ff_pct, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
+    return apply_min_filters(df, dm_ff_gt0, min_ff_pct, dm_min_adtv_1m, dm_min_adtv_3m, dm_min_adtv_6m, dm_min_adtv_12m, liq_ratio_min)
 
 def em_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
-    return apply_min_filters(df, em_ff_gt0, min_ff_pct, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
+    return apply_min_filters(df, em_ff_gt0, min_ff_pct, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
@@ -419,9 +432,13 @@ c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 # Show active filter summary (post-segment filters)
 active_filters = []
 if dm_ff_gt0:           active_filters.append("DM FF MCap > 0")
+if dm_min_adtv_1m  > 0: active_filters.append(f"DM 1M ADTV ≥ {dm_min_adtv_1m:,.0f} USD")
+if dm_min_adtv_3m  > 0: active_filters.append(f"DM 3M ADTV ≥ {dm_min_adtv_3m:,.0f} USD")
 if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,.0f} USD")
 if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,.0f} USD")
 if em_ff_gt0:           active_filters.append("EM FF MCap > 0")
+if em_min_adtv_1m  > 0: active_filters.append(f"EM 1M ADTV ≥ {em_min_adtv_1m:,.0f} USD")
+if em_min_adtv_3m  > 0: active_filters.append(f"EM 3M ADTV ≥ {em_min_adtv_3m:,.0f} USD")
 if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
 if em_min_adtv_12m > 0: active_filters.append(f"EM 12M ADTV ≥ {em_min_adtv_12m:,.0f} USD")
 if min_ff_pct      > 0: active_filters.append(f"FF% ≥ {min_ff_pct*100:.1f}%")
