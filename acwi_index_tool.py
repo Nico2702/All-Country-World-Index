@@ -604,6 +604,73 @@ with tab_overview:
     fig.update_layout(height=450, paper_bgcolor="#0f1117", plot_bgcolor="#0f1117", margin=dict(t=10,b=10,l=10,r=10))
     st.plotly_chart(fig, use_container_width=True)
 
+    # ── ADTV Sensitivity Table ───────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**ADTV Threshold Sensitivity — World Index & ACWI**")
+    st.caption("Zeigt wie viele Stocks je ADTV-Kombination den Index erreichen (alle anderen aktiven Filter bleiben konstant). Verwendet Variant 1 (Global) für DM und EM Threshold-Methodik.")
+
+    # Pre-compute segments once
+    _sens_dm = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+    _sens_em_ref = get_dm_cutoff_stock(_sens_dm)
+    _sens_cutoff  = _sens_em_ref["Total MCap Y2025"] if _sens_em_ref is not None else 0
+    _sens_em_df, _ = filter_em_by_threshold(df_em, _sens_cutoff, em_threshold_pct)
+
+    # Base filters (everything except ADTV)
+    def _base_filter_dm(df):
+        return apply_min_filters(df, dm_ff_gt0, min_ff_pct, max_closing_price,
+                                  0, 0, 0, 0, liq_ratio_min)
+    def _base_filter_em(df):
+        return apply_min_filters(df, em_ff_gt0, min_ff_pct, max_closing_price,
+                                  0, 0, 0, 0, liq_ratio_min)
+
+    # Use sidebar field values directly (ignoring checkbox state)
+    _adtv_periods = {
+        "1M":  ("1M ADTV Y2025",  parse_adtv(st.session_state.get("dm_1m",  "1500000")), parse_adtv(st.session_state.get("em_1m",  "750000"))),
+        "3M":  ("3M ADTV Y2025",  parse_adtv(st.session_state.get("dm_3m",  "1500000")), parse_adtv(st.session_state.get("em_3m",  "750000"))),
+        "6M":  ("6M ADTV Y2025",  parse_adtv(st.session_state.get("dm_6m",  "1500000")), parse_adtv(st.session_state.get("em_6m",  "750000"))),
+        "12M": ("12M ADTV Y2025", parse_adtv(st.session_state.get("dm_12m", "1500000")), parse_adtv(st.session_state.get("em_12m", "750000"))),
+    }
+    _combos = [
+        ("1M",), ("3M",), ("6M",), ("12M",),
+        ("1M","3M"), ("1M","6M"), ("1M","12M"),
+        ("3M","6M"), ("3M","12M"), ("6M","12M"),
+        ("1M","3M","6M"), ("1M","3M","12M"), ("1M","6M","12M"), ("3M","6M","12M"),
+        ("1M","3M","6M","12M"),
+    ]
+
+    # Pre-compute EM segments (global 85% for sensitivity)
+    _sens_em_seg = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+
+    _sens_rows = []
+    for combo in _combos:
+        label = " + ".join(combo)
+        _dm_f = _base_filter_dm(_sens_dm[_sens_dm["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])])
+        _em_f = _base_filter_em(_sens_em_df[_sens_em_df["Segment"] == "EM Included"])
+        _em_seg_f = _base_filter_em(_sens_em_seg[_sens_em_seg["Segment"].isin(["Large Cap","Mid Cap"])])
+        for period in combo:
+            col, dm_thr, em_thr = _adtv_periods[period]
+            if dm_thr > 0: _dm_f     = _dm_f[_dm_f[col]         >= dm_thr]
+            if em_thr > 0: _em_f     = _em_f[_em_f[col]         >= em_thr]
+            if em_thr > 0: _em_seg_f = _em_seg_f[_em_seg_f[col] >= em_thr]
+        _dm_lc  = len(_dm_f[_dm_f["Segment"] == "Large Cap"])
+        _dm_mc  = len(_dm_f[_dm_f["Segment"] == "Mid Cap"])
+        _wld    = _dm_lc + _dm_mc
+        _em_lc  = len(_em_seg_f[_em_seg_f["Segment"] == "Large Cap"])
+        _em_mc  = len(_em_seg_f[_em_seg_f["Segment"] == "Mid Cap"])
+        _acwi   = _wld + len(_em_f)
+        _sens_rows.append({
+            "ADTV Kombination": label,
+            "DM Large Cap": _dm_lc,
+            "DM Mid Cap":   _dm_mc,
+            "World Index":  _wld,
+            "EM Large Cap": _em_lc,
+            "EM Mid Cap":   _em_mc,
+            "ACWI Index":   _acwi,
+        })
+
+    _sens_df = pd.DataFrame(_sens_rows)
+    st.dataframe(_sens_df, use_container_width=True, hide_index=True)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2: VARIANT 1 — GLOBAL DM THRESHOLDS
