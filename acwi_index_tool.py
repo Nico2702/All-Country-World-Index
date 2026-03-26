@@ -1170,12 +1170,13 @@ with tab_acwi:
 
         _dm_cutoff_label = format_bn(cutoff_stock["Total MCap Y2025"]) if cutoff_stock is not None else "—"
         st.markdown(f"**DM Included ({len(df_acwi_dm):,} Stocks | Total MCap ≥ {_dm_cutoff_label})**")
-        _all_dm_countries = sorted(df_dm["Exchange Country Name"].unique())
-        dm_country_tbl = df_acwi_dm.groupby("Exchange Country Name").agg(
+        _all_dm_countries = sorted(df_dm["Mapping Country"].dropna().unique()) if "Mapping Country" in df_dm.columns else sorted(df_dm["Exchange Country Name"].unique())
+        _dm_country_col = "Mapping Country" if "Mapping Country" in df_acwi_dm.columns else "Exchange Country Name"
+        dm_country_tbl = df_acwi_dm.groupby(_dm_country_col).agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_Total_MCap=("Total MCap Y2025","mean"),
-        ).reset_index()
+        ).reset_index().rename(columns={_dm_country_col: "Exchange Country Name"})
         _dm_all_c = pd.DataFrame({"Exchange Country Name": _all_dm_countries})
         dm_country_tbl = _dm_all_c.merge(dm_country_tbl, on="Exchange Country Name", how="left")
         dm_country_tbl["Stocks"] = dm_country_tbl["Stocks"].fillna(0).astype(int)
@@ -1300,12 +1301,13 @@ with tab_acwi:
         )
 
         st.markdown(f"**{em_col_label}**")
-        _all_em_countries = sorted(df_em["Exchange Country Name"].unique())
-        em_country = df_acwi_em.groupby("Exchange Country Name").agg(
+        _all_em_countries = sorted(df_em["Mapping Country"].dropna().unique()) if "Mapping Country" in df_em.columns else sorted(df_em["Exchange Country Name"].unique())
+        _em_country_col = "Mapping Country" if "Mapping Country" in df_acwi_em.columns else "Exchange Country Name"
+        em_country = df_acwi_em.groupby(_em_country_col).agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_Total_MCap=("Total MCap Y2025","mean"),
-        ).reset_index()
+        ).reset_index().rename(columns={_em_country_col: "Exchange Country Name"})
         _em_all_c = pd.DataFrame({"Exchange Country Name": _all_em_countries})
         em_country = _em_all_c.merge(em_country, on="Exchange Country Name", how="left")
         em_country["Stocks"] = em_country["Stocks"].fillna(0).astype(int)
