@@ -596,7 +596,7 @@ st.markdown("---")
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
 tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
     "🌍 Universe Overview",
-    "📐 Variant 1 — Global DM Thresholds",
+    "📐 Variant 1 — Global / MSCI DM Thresholds",
     "🗺️ Variant 2 — Per-Country / Solactive DM Thresholds",
     "🌐 ACWI (DM + EM)",
     "⚖️ Variant Comparison (World)",
@@ -658,7 +658,7 @@ with tab_overview:
     # ── ADTV Sensitivity Table ───────────────────────────────────────────────
     st.markdown("---")
     st.markdown("**ADTV Threshold Sensitivity — World Index & ACWI**")
-    st.caption("Zeigt wie viele Stocks je ADTV-Kombination den Index erreichen (alle anderen aktiven Filter bleiben konstant). Verwendet Variant 1 (Global) für DM und EM Threshold-Methodik.")
+    st.caption("Zeigt wie viele Stocks je ADTV-Kombination den Index erreichen (alle anderen aktiven Filter bleiben konstant). Verwendet Variant 1 (Global / MSCI) für DM und EM Threshold-Methodik.")
 
     # Pre-compute segments once
     _sens_dm = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
@@ -727,7 +727,7 @@ with tab_overview:
 # TAB 2: VARIANT 1 — GLOBAL DM THRESHOLDS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_v1:
-    st.subheader("Variant 1 — Global DM Thresholds")
+    st.subheader("Variant 1 — Global / MSCI DM Thresholds")
     st.markdown(f"""
     <div class="info-box">
     <b>Methodik:</b> Alle DM-Aktien werden global nach Free Float MCap absteigend sortiert.
@@ -927,9 +927,9 @@ with tab_v2:
 with tab_acwi:
     st.subheader("ACWI — All Country World Index (DM + EM)")
 
-    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global)", "Variant 2 (Per-Country / Solactive)"], horizontal=True)
+    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global / MSCI)", "Variant 2 (Per-Country / Solactive)"], horizontal=True)
 
-    if acwi_variant == "Variant 1 (Global)":
+    if acwi_variant == "Variant 1 (Global / MSCI)":
         df_dm_seg = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
     else:
         df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
