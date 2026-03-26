@@ -1524,7 +1524,7 @@ with tab_acwi_compare:
     fig_weights.update_layout(
         barmode="stack", template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
         height=360, margin=dict(t=10,b=120,l=60,r=10),
-        xaxis_tickangle=-25,
+        
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
     st.plotly_chart(fig_weights, use_container_width=True)
