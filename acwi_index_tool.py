@@ -57,6 +57,7 @@ def format_bn(val):
     return f"{val:.0f}"
 
 
+@st.cache_data
 def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
     """Global DM threshold approach.
     Sort by Total MCap desc → cumulative sum on FF MCap → segment by ENDING cum_pct.
@@ -80,6 +81,7 @@ def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
     return df
 
 
+@st.cache_data
 def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
     """Per-country threshold approach.
     Sort by Total MCap desc within each country → cumulative sum on FF MCap → segment by ENDING cum_pct.
@@ -155,6 +157,7 @@ def get_dm_cutoff_stock_v2(df_dm, large_pct, mid_pct, small_pct, mode="min"):
     return selected, df_cutoffs
 
 
+@st.cache_data
 def filter_em_by_threshold(df_em, cutoff_total_mcap, pct):
     """Include EM stocks whose Total MCap >= pct% of the DM cutoff stock Total MCap."""
     min_mcap = cutoff_total_mcap * (pct / 100.0)
@@ -165,6 +168,7 @@ def filter_em_by_threshold(df_em, cutoff_total_mcap, pct):
     return df, min_mcap
 
 
+@st.cache_data
 def filter_em_per_country(df_em, pct=85):
     """Apply per-country cumulative FF MCap rule to EM (same as Variant 2 for DM).
     Sort by Total MCap desc within each EM country, cumulate FF MCap,
@@ -192,31 +196,35 @@ def filter_em_per_country(df_em, pct=85):
 def get_exclusion_reasons(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None,
                            min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0,
                            min_liq_ratio=0.0):
-    """Return a Series of exclusion reason strings per stock. Empty string = included."""
-    liq = df.apply(
-        lambda r: (r["12M ADTV Y2025"] / r["Free Float MCap Y2025"] * 252 * 100)
-                  if r["Free Float MCap Y2025"] > 0 else 0, axis=1
-    )
-    reasons = []
-    for idx, row in df.iterrows():
-        r = []
-        if ff_gt0 and (pd.isna(row["Free Float MCap Y2025"]) or row["Free Float MCap Y2025"] <= 0):
-            r.append("FF MCap ≤ 0 or missing")
-        if min_ff_pct > 0 and row["Free Float Percent"] < min_ff_pct:
-            r.append(f"FF% < {min_ff_pct*100:.0f}%")
-        if max_closing_price is not None and row["Closing Price"] > max_closing_price:
-            r.append(f"Price > {max_closing_price:,.0f}")
-        if min_adtv_1m  > 0 and row["1M ADTV Y2025"]  < min_adtv_1m:
-            r.append(f"1M ADTV < {min_adtv_1m:,.0f}")
-        if min_adtv_3m  > 0 and row["3M ADTV Y2025"]  < min_adtv_3m:
-            r.append(f"3M ADTV < {min_adtv_3m:,.0f}")
-        if min_adtv_6m  > 0 and row["6M ADTV Y2025"]  < min_adtv_6m:
-            r.append(f"6M ADTV < {min_adtv_6m:,.0f}")
-        if min_adtv_12m > 0 and row["12M ADTV Y2025"] < min_adtv_12m:
-            r.append(f"12M ADTV < {min_adtv_12m:,.0f}")
-        if min_liq_ratio > 0 and liq[idx] < min_liq_ratio:
-            r.append(f"Liq. Ratio < {min_liq_ratio:.1f}%")
-        reasons.append(" | ".join(r))
+    """Return a Series of exclusion reason strings per stock. Fully vectorized."""
+    n = len(df)
+    # Build boolean masks per criterion
+    masks = {}
+    if ff_gt0:
+        masks["FF MCap ≤ 0 or missing"] = df["Free Float MCap Y2025"].isna() | (df["Free Float MCap Y2025"] <= 0)
+    if min_ff_pct > 0:
+        masks[f"FF% < {min_ff_pct*100:.0f}%"] = df["Free Float Percent"] < min_ff_pct
+    if max_closing_price is not None:
+        masks[f"Price > {max_closing_price:,.0f}"] = df["Closing Price"] > max_closing_price
+    if min_adtv_1m  > 0: masks[f"1M ADTV < {min_adtv_1m:,.0f}"]  = df["1M ADTV Y2025"]  < min_adtv_1m
+    if min_adtv_3m  > 0: masks[f"3M ADTV < {min_adtv_3m:,.0f}"]  = df["3M ADTV Y2025"]  < min_adtv_3m
+    if min_adtv_6m  > 0: masks[f"6M ADTV < {min_adtv_6m:,.0f}"]  = df["6M ADTV Y2025"]  < min_adtv_6m
+    if min_adtv_12m > 0: masks[f"12M ADTV < {min_adtv_12m:,.0f}"] = df["12M ADTV Y2025"] < min_adtv_12m
+    if min_liq_ratio > 0:
+        liq = np.where(df["Free Float MCap Y2025"] > 0,
+                       df["12M ADTV Y2025"] / df["Free Float MCap Y2025"] * 252 * 100, 0)
+        masks[f"Liq. Ratio < {min_liq_ratio:.1f}%"] = liq < min_liq_ratio
+
+    if not masks:
+        return pd.Series([""] * n, index=df.index)
+
+    # Build reason strings vectorized
+    reasons = pd.Series([""] * n, index=df.index)
+    for label, mask in masks.items():
+        has_reason = reasons != ""
+        reasons = np.where(mask,
+            np.where(has_reason, reasons + " | " + label, label),
+            reasons)
     return pd.Series(reasons, index=df.index)
 
 
@@ -231,10 +239,8 @@ def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None, m
     if min_adtv_6m  > 0:  mask &= df["6M ADTV Y2025"]  >= min_adtv_6m
     if min_adtv_12m > 0:  mask &= df["12M ADTV Y2025"] >= min_adtv_12m
     if min_liq_ratio > 0:
-        liq = df.apply(
-            lambda r: (r["12M ADTV Y2025"] / r["Free Float MCap Y2025"] * 252 * 100)
-                      if r["Free Float MCap Y2025"] > 0 else 0, axis=1
-        )
+        liq = np.where(df["Free Float MCap Y2025"] > 0,
+                       df["12M ADTV Y2025"] / df["Free Float MCap Y2025"] * 252 * 100, 0)
         mask &= liq >= min_liq_ratio
     return df[mask].copy()
 
@@ -274,11 +280,11 @@ def add_ff_weight(df):
 def add_adjusted_weight(df, china_factor=0.20):
     """Add Adjusted Weight (%) column applying inclusion factor for China A-Shares.
     Shanghai & Shenzhen stocks get FF MCap * china_factor, all others * 1.0.
+    Fully vectorized — no apply().
     """
     df = df.copy()
     is_china_a = df["Exchange Name"].isin(["SHANGHAI", "SHENZHEN"])
-    df["Inclusion Factor"] = 1.0
-    df.loc[is_china_a, "Inclusion Factor"] = china_factor
+    df["Inclusion Factor"] = np.where(is_china_a, china_factor, 1.0)
     df["Adjusted FF MCap"] = df["Free Float MCap Y2025"] * df["Inclusion Factor"]
     total_adj = df["Adjusted FF MCap"].sum()
     df["Adjusted Weight (%)"] = (df["Adjusted FF MCap"] / total_adj * 100) if total_adj > 0 else 0.0
