@@ -1084,7 +1084,7 @@ with tab_acwi:
         })
         _dm_all = dm_post_filter(df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])])
         _dm_seg_rows.append({
-            "Segment": "Total Included",
+            "Segment": "Total Universe",
             "# Stocks": len(_dm_all),
             "FF MCap (USD)": format_bn(_dm_all["Free Float MCap Y2025"].sum()),
             "Avg FF MCap (USD)": "—",
@@ -1147,44 +1147,65 @@ with tab_acwi:
                 "FF MCap (USD)": "—",
                 "Avg FF MCap (USD)": "—",
             })
+            _em_seg_rows.append({
+                "Segment": "Total Universe",
+                "# Stocks": len(df_em),
+                "FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": "—",
+            })
         else:
-            # Threshold: rank within qualified EM stocks and assign Large/Mid/Small
-            _em_ranked = df_acwi_em.sort_values("Total MCap Y2025", ascending=False).copy()
-            _em_total_ff = _em_ranked["Free Float MCap Y2025"].sum()
-            if _em_total_ff > 0:
-                _em_ranked["cum_pct"] = _em_ranked["Free Float MCap Y2025"].cumsum() / _em_total_ff * 100
-                _em_ranked["EM Segment"] = _em_ranked["cum_pct"].apply(
-                    lambda x: "Large Cap" if x <= large_thr else ("Mid Cap" if x <= mid_thr else "Small Cap")
+            # Threshold method — two separate calculations:
+            # Rechnung 1: stocks that pass threshold → rank by cum FF MCap → Large (≤70%) / Mid (≤85%)
+            _em_above = df_acwi_em.sort_values("Total MCap Y2025", ascending=False).copy()
+            _em_above_ff = _em_above["Free Float MCap Y2025"].sum()
+            if _em_above_ff > 0:
+                _em_above["cum_pct"] = _em_above["Free Float MCap Y2025"].cumsum() / _em_above_ff * 100
+                _em_above["EM Segment"] = _em_above["cum_pct"].apply(
+                    lambda x: "Large Cap" if x <= large_thr else "Mid Cap"
                 )
             else:
-                _em_ranked["EM Segment"] = "Small Cap"
+                _em_above["EM Segment"] = "Mid Cap"
+
+            # Rechnung 2: stocks that do NOT pass threshold → rank → Small Cap (≤99%), rest excluded
+            _em_full = df_em_result.copy()
+            _em_below = _em_full[_em_full["Segment"] != "EM Included"].sort_values("Total MCap Y2025", ascending=False).copy()
+            _em_below_ff = _em_below["Free Float MCap Y2025"].sum()
+            if _em_below_ff > 0:
+                _em_below["cum_pct"] = _em_below["Free Float MCap Y2025"].cumsum() / _em_below_ff * 100
+                _em_below["EM Segment"] = _em_below["cum_pct"].apply(
+                    lambda x: "Small Cap" if x <= small_thr else "Excluded"
+                )
+            else:
+                _em_below["EM Segment"] = "Excluded"
+            _em_sc = _em_below[_em_below["EM Segment"] == "Small Cap"]
+
             _em_seg_rows = []
             for seg in ["Large Cap", "Mid Cap"]:
-                _s = _em_ranked[_em_ranked["EM Segment"] == seg]
+                _s = _em_above[_em_above["EM Segment"] == seg]
                 _em_seg_rows.append({
                     "Segment": seg,
                     "# Stocks": len(_s),
                     "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
                     "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—",
                 })
-            _em_lm = _em_ranked[_em_ranked["EM Segment"].isin(["Large Cap","Mid Cap"])]
             _em_seg_rows.append({
                 "Segment": "Total Stocks - EM",
-                "# Stocks": len(_em_lm),
-                "FF MCap (USD)": format_bn(_em_lm["Free Float MCap Y2025"].sum()),
+                "# Stocks": len(_em_above),
+                "FF MCap (USD)": format_bn(_em_above["Free Float MCap Y2025"].sum()),
                 "Avg FF MCap (USD)": "—",
             })
-            _em_sc = _em_ranked[_em_ranked["EM Segment"] == "Small Cap"]
             _em_seg_rows.append({
                 "Segment": "Small Cap",
                 "# Stocks": len(_em_sc),
                 "FF MCap (USD)": format_bn(_em_sc["Free Float MCap Y2025"].sum()),
                 "Avg FF MCap (USD)": format_bn(_em_sc["Free Float MCap Y2025"].mean()) if len(_em_sc) > 0 else "—",
             })
+        # Total Universe — all EM stocks that have a segment (above + small cap)
+        _em_universe_total = len(df_em_result[df_em_result["Free Float MCap Y2025"] > 0]) if "df_em_result" in dir() else len(df_acwi_em)
         _em_seg_rows.append({
-            "Segment": "Total Included",
-            "# Stocks": len(df_acwi_em),
-            "FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].sum()),
+            "Segment": "Total Universe",
+            "# Stocks": len(df_em),
+            "FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].sum()),
             "Avg FF MCap (USD)": "—",
         })
         st.dataframe(pd.DataFrame(_em_seg_rows), use_container_width=True, hide_index=True)
