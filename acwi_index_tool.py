@@ -1493,18 +1493,23 @@ with tab_acwi_compare:
         f"EM Global {mid_thr}%": em_g85,
         f"EM Per-Country {mid_thr}%": em_pc,
     }
+    # Only meaningful combinations
+    _valid_combos = [
+        (f"V1 (MSCI) + EM Threshold ({em_threshold_pct}%)", dm_world_v1, em_thr),
+        (f"V1 (MSCI) + EM Global {mid_thr}%",               dm_world_v1, em_g85),
+        (f"V2 (Solactive) + EM Per-Country {mid_thr}%",     dm_world_v2, em_pc),
+    ]
     _weight_rows = []
-    for em_label, em_df in _em_methods.items():
-        for dm_label, dm_df in [("V1 (MSCI)", dm_world_v1), ("V2 (Solactive)", dm_world_v2)]:
-            _dm_adj = _adj_ff(dm_df)
-            _em_adj = _adj_ff(em_df)
-            _total  = _dm_adj + _em_adj
-            if _total > 0:
-                _weight_rows.append({
-                    "Variante": f"{dm_label} + {em_label}",
-                    "DM Weight (%)": round(_dm_adj / _total * 100, 2),
-                    "EM Weight (%)": round(_em_adj / _total * 100, 2),
-                })
+    for label, dm_df, em_df in _valid_combos:
+        _dm_adj = _adj_ff(dm_df)
+        _em_adj = _adj_ff(em_df)
+        _total  = _dm_adj + _em_adj
+        if _total > 0:
+            _weight_rows.append({
+                "Variante": label,
+                "DM Weight (%)": round(_dm_adj / _total * 100, 2),
+                "EM Weight (%)": round(_em_adj / _total * 100, 2),
+            })
 
     _weight_df = pd.DataFrame(_weight_rows)
     fig_weights = go.Figure()
