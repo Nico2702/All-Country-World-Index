@@ -1273,7 +1273,7 @@ with tab_acwi:
             y=_by_stocks["Exchange Country Name"],
             orientation="h",
             marker_color="#2979ff",
-            text=_by_stocks["Stock_Pct"].apply(lambda x: f"{x:.1f}%"),
+            text=_by_stocks["Stock_Pct"].apply(lambda x: f"{x:.2f}%"),
             textposition="outside",
         ))
         fig_stocks.update_layout(
