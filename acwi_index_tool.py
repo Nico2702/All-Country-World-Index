@@ -380,16 +380,17 @@ with st.sidebar:
     st.markdown("### ⚙️ Index Parameters")
 
     listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
-    exclude_hk_cny = st.checkbox("Exclude Hong Kong (CNY)", value=True,
-        help="Schließt alle Aktien aus, wo Exchange Ticker = HKG und Trading Currency = CNY.")
-    exclude_country_risk_na = st.checkbox("Exclude Country of Risk = @", value=True,
-        help="Schließt Aktien aus, wo Country of Risk = '@' (nicht zugewiesen).")
-    exclude_naics_funds = st.checkbox("Exclude NAICS = Open-End Investment Funds", value=True,
-        help="Schließt Investmentfonds aus.")
-    exclude_euro_mtf = st.checkbox("Exclude Exchange = Euro MTF / @", value=True,
-        help="Schließt Aktien aus, wo Exchange Name = 'Euro MTF' oder '@'.")
-    exclude_etf_sicav = st.checkbox("Exclude Name enthält ETF / SICAV", value=True,
-        help="Schließt Aktien aus, wo der Name das eigenständige Wort 'ETF' oder 'SICAV' enthält.")
+    with st.expander("Exclusions", expanded=False):
+        exclude_hk_cny = st.checkbox("HK (CNY)", value=True,
+            help="Exchange Ticker enthält HKG & Trading Currency = CNY")
+        exclude_country_risk_na = st.checkbox("Country of Risk = @", value=True,
+            help="Country of Risk ist nicht zugewiesen (@)")
+        exclude_naics_funds = st.checkbox("NAICS = Investment Funds", value=True,
+            help="NAICS = Open-End Investment Funds")
+        exclude_euro_mtf = st.checkbox("Exchange = Euro MTF / @", value=True,
+            help="Exchange Name ist 'Euro MTF' oder '@'")
+        exclude_etf_sicav = st.checkbox("Name: ETF / SICAV", value=True,
+            help="Name enthält eigenständiges Wort 'ETF' oder 'SICAV'")
 
     st.markdown("**DM Percentile Thresholds**")
     _la, _lb = st.columns([3, 4])
