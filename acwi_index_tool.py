@@ -380,6 +380,9 @@ with st.sidebar:
     st.markdown("### ⚙️ Index Parameters")
 
     listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
+    thailand_sec_type = st.radio("Thailand:", ["SHARE", "NVDR"], index=1,
+        horizontal=True, key="thailand_sec_type",
+        help="Für Thailand (Exchange Name = THAILAND): welcher Sec Type wird berücksichtigt? Der andere wird excludiert.")
     with st.expander("Exclusions", expanded=False):
         exclude_hk_cny = st.checkbox("HK (CNY)", value=True,
             help="Exchange Ticker enthält HKG & Trading Currency = CNY")
@@ -391,12 +394,7 @@ with st.sidebar:
             help="Exchange Name ist 'Euro MTF' oder '@'")
         exclude_etf_sicav = st.checkbox("Name: ETF / SICAV", value=True,
             help="Name enthält eigenständiges Wort 'ETF' oder 'SICAV'")
-        st.divider()
-        st.markdown("**Thailand Sec Type**")
-        thailand_sec_type = st.radio("", ["SHARE", "NVDR"], index=1,
-            horizontal=True, key="thailand_sec_type",
-            label_visibility="collapsed",
-            help="Für Thailand: welcher Sec Type wird berücksichtigt? Der andere wird excludiert.")
+
 
     st.markdown("**DM Percentile Thresholds**")
     _la, _lb = st.columns([3, 4])
