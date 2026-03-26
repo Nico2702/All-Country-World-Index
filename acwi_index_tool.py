@@ -1239,8 +1239,68 @@ with tab_acwi:
         st.dataframe(em_country[["Exchange Country Name","Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]],
                      use_container_width=True, hide_index=True)
 
+    # ── Country Charts ───────────────────────────────────────────────────────
+    st.markdown("**ACWI — Länderübersicht**")
+
+    _acwi_all = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
+    _total_stocks = len(_acwi_all)
+    _total_ff = _acwi_all["Free Float MCap Y2025"].sum()
+
+    _country_agg = _acwi_all.groupby(["Exchange Country Name","Classification"]).agg(
+        Stocks=("Symbol","count"),
+        FF_MCap=("Free Float MCap Y2025","sum"),
+    ).reset_index()
+    _country_agg["Stock %"] = (_country_agg["Stocks"] / _total_stocks * 100).round(2)
+    _country_agg["Weight %"] = (_country_agg["FF_MCap"] / _total_ff * 100).round(2)
+
+    _by_stocks = _country_agg.groupby("Exchange Country Name").agg(
+        Stocks=("Stocks","sum"), Stock_Pct=("Stock %","sum")
+    ).reset_index().sort_values("Stocks", ascending=True).tail(30)
+
+    _by_weight = _country_agg.groupby("Exchange Country Name").agg(
+        FF_MCap=("FF_MCap","sum"), Weight_Pct=("Weight %","sum")
+    ).reset_index().sort_values("FF_MCap", ascending=True).tail(30)
+
+    _col1, _col2 = st.columns(2)
+
+    with _col1:
+        st.markdown("**Nach Anzahl Stocks (%)**")
+        fig_stocks = go.Figure(go.Bar(
+            x=_by_stocks["Stock_Pct"],
+            y=_by_stocks["Exchange Country Name"],
+            orientation="h",
+            marker_color="#2979ff",
+            text=_by_stocks["Stock_Pct"].apply(lambda x: f"{x:.1f}%"),
+            textposition="outside",
+        ))
+        fig_stocks.update_layout(
+            template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60),
+            xaxis_title="% Anzahl", yaxis_title=None,
+            xaxis=dict(showgrid=False),
+        )
+        st.plotly_chart(fig_stocks, use_container_width=True)
+
+    with _col2:
+        st.markdown("**Nach Gewicht (FF MCap %)**")
+        fig_weight = go.Figure(go.Bar(
+            x=_by_weight["Weight_Pct"],
+            y=_by_weight["Exchange Country Name"],
+            orientation="h",
+            marker_color="#ce93d8",
+            text=_by_weight["Weight_Pct"].apply(lambda x: f"{x:.1f}%"),
+            textposition="outside",
+        ))
+        fig_weight.update_layout(
+            template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60),
+            xaxis_title="% Gewicht", yaxis_title=None,
+            xaxis=dict(showgrid=False),
+        )
+        st.plotly_chart(fig_weight, use_container_width=True)
+
     # ── Combined Donut ───────────────────────────────────────────────────────
-    st.markdown("**ACWI Composition**")
+    st.markdown("**ACWI Composition (DM vs EM)**")
     acwi_summary = []
     for seg in ["Large Cap", "Mid Cap"]:
         dm_ff = df_acwi_dm[df_acwi_dm["Segment"]==seg]["Free Float MCap Y2025"].sum()
