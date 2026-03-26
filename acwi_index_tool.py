@@ -1050,10 +1050,23 @@ with tab_acwi:
 
     with col_dm:
         st.markdown("**DM Segments (World Index)**")
-        s = segment_summary(df_dm_seg)
-        s["FF MCap (USD)"] = s["FF MCap (USD)"].apply(format_bn)
-        s["Avg FF MCap (USD)"] = s["Avg FF MCap (USD)"].apply(format_bn)
-        st.dataframe(s, use_container_width=True, hide_index=True)
+        # Use post-filtered df_acwi_dm for consistent counts
+        _dm_seg_rows = []
+        for seg in ["Large Cap", "Mid Cap", "Small Cap"]:
+            _s = dm_post_filter(df_dm_seg[df_dm_seg["Segment"] == seg])
+            _dm_seg_rows.append({
+                "Segment": seg,
+                "# Stocks": len(_s),
+                "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—",
+            })
+        _dm_seg_rows.append({
+            "Segment": "Total Included",
+            "# Stocks": len(df_acwi_dm),
+            "FF MCap (USD)": format_bn(df_acwi_dm["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(df_acwi_dm["Free Float MCap Y2025"].mean()) if len(df_acwi_dm) > 0 else "—",
+        })
+        st.dataframe(pd.DataFrame(_dm_seg_rows), use_container_width=True, hide_index=True)
 
         _dm_cutoff_label = format_bn(cutoff_stock["Total MCap Y2025"]) if cutoff_stock is not None else "—"
         st.markdown(f"**DM Included ({len(df_acwi_dm):,} Stocks | Total MCap ≥ {_dm_cutoff_label})**")
@@ -1070,18 +1083,25 @@ with tab_acwi:
 
     with col_em:
         st.markdown(f"**EM Segments**")
-        # Apply DM-style Large/Mid/Small segmentation to EM universe
-        _em_for_seg = compute_variant1(df_acwi_em, large_thr, mid_thr, small_thr)
+        # Rank EM stocks within df_acwi_em and assign Large/Mid/Small by cumulative FF MCap
+        _em_ranked = df_acwi_em.sort_values("Total MCap Y2025", ascending=False).copy()
+        _em_total_ff = _em_ranked["Free Float MCap Y2025"].sum()
+        if _em_total_ff > 0:
+            _em_ranked["cum_pct"] = _em_ranked["Free Float MCap Y2025"].cumsum() / _em_total_ff * 100
+            _em_ranked["EM Segment"] = _em_ranked["cum_pct"].apply(
+                lambda x: "Large Cap" if x <= large_thr else ("Mid Cap" if x <= mid_thr else "Small Cap")
+            )
+        else:
+            _em_ranked["EM Segment"] = "Small Cap"
         _em_seg_rows = []
         for seg in ["Large Cap", "Mid Cap", "Small Cap"]:
-            _s = _em_for_seg[_em_for_seg["Segment"] == seg]
+            _s = _em_ranked[_em_ranked["EM Segment"] == seg]
             _em_seg_rows.append({
                 "Segment": seg,
                 "# Stocks": len(_s),
                 "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
                 "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—",
             })
-        _em_total = _em_for_seg[_em_for_seg["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])]
         _em_seg_rows.append({
             "Segment": "Total Included",
             "# Stocks": len(df_acwi_em),
