@@ -392,8 +392,8 @@ with st.sidebar:
             help="NAICS = Open-End Investment Funds")
         exclude_euro_mtf = st.checkbox("Exchange = Euro MTF / @", value=True,
             help="Exchange Name ist 'Euro MTF' oder '@'")
-        exclude_etf_sicav = st.checkbox("Name: ETF / SICAV", value=True,
-            help="Name enthält eigenständiges Wort 'ETF' oder 'SICAV'")
+        exclude_etf_sicav = st.checkbox("Name: ETF / SICAV / %", value=True,
+            help="Name enthält eigenständiges Wort 'ETF', 'SICAV' oder '%'")
 
 
     st.markdown("**DM Percentile Thresholds**")
@@ -582,7 +582,7 @@ if exclude_naics_funds and "NAICS" in df_raw.columns:
 if exclude_euro_mtf:
     df_raw = df_raw[~df_raw["Exchange Name"].fillna("").isin(["Euro MTF", "@"])].copy()
 
-# Exclude Name contains standalone word ETF or SICAV
+# Exclude Name contains standalone word ETF, SICAV or %
 if exclude_etf_sicav:
     import re
     _etf_pattern = re.compile(r'ETF|SICAV', re.IGNORECASE)
