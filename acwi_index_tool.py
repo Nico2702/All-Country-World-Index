@@ -347,9 +347,17 @@ def load_excel(file):
     except Exception:
         df = pd.read_excel(file)
     for col in ["Free Float MCap Y2025","Total MCap Y2025","Free Float Percent",
-                "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025"]:
+                "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025",
+                "Closing Price"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    # Ensure new country columns exist (backward compat with older files)
+    for col in ["Country of Incorp","Country of Risk","Country HQ"]:
+        if col not in df.columns:
+            df[col] = df.get("Exchange Country Name", "")
+    # Rename Industry typo if present
+    if "Inudstry" in df.columns and "Industry" not in df.columns:
+        df.rename(columns={"Inudstry": "Industry"}, inplace=True)
     return df
 
 
@@ -517,11 +525,25 @@ else:
 # ── Apply Country Classification from repo file ──────────────────────────────
 country_cls = load_classification()
 if country_cls:
-    df_raw["Classification"] = df_raw["Exchange Country Name"].map(country_cls)
-    unmatched = df_raw[df_raw["Classification"].isna()]["Exchange Country Name"].unique()
+    # New mapping logic:
+    # IF Exchange Country Name == Country of Incorp → use Exchange Country Name
+    # ELSE → use Country of Risk
+    def map_classification(row):
+        if row.get("Exchange Country Name","") == row.get("Country of Incorp",""):
+            return country_cls.get(row["Exchange Country Name"])
+        else:
+            return country_cls.get(row.get("Country of Risk",""))
+
+    df_raw["Mapping Country"] = df_raw.apply(
+        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+                  else r.get("Country of Risk",""), axis=1
+    )
+    df_raw["Classification"] = df_raw["Mapping Country"].map(country_cls)
+
+    unmatched = df_raw[df_raw["Classification"].isna()]["Mapping Country"].unique()
     if len(unmatched) > 0:
         st.warning(f"⚠️ {len(unmatched)} Länder nicht in Country_Classification.xlsx gefunden "
-                   f"und werden ignoriert: {', '.join(sorted(unmatched))}")
+                   f"und werden ignoriert: {', '.join(sorted([str(u) for u in unmatched if u]))}")
     df_raw = df_raw[df_raw["Classification"].notna()].copy()
 
 # Apply listing filter
