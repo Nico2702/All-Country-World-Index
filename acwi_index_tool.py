@@ -1482,25 +1482,46 @@ with tab_acwi_compare:
     em_inc_v1 = em_thr  # for downstream charts
     em_inc_v2 = em_thr
 
-    # ── DM/EM Weight Comparison ──────────────────────────────────────────────
-    st.markdown("**DM vs EM Gewichtung (mit Threshold-EM)**")
-    weight_data = pd.DataFrame({
-        "Kategorie": ["DM Weight","EM Weight","DM Weight","EM Weight"],
-        "Variante":  ["DM Variant 1","DM Variant 1","DM Variant 2","DM Variant 2"],
-        "Weight (%)": [
-            dm_world_v1["Free Float MCap Y2025"].sum()/ff_acwi_v1*100 if ff_acwi_v1>0 else 0,
-            em_thr["Free Float MCap Y2025"].sum()/ff_acwi_v1*100 if ff_acwi_v1>0 else 0,
-            dm_world_v2["Free Float MCap Y2025"].sum()/ff_acwi_v2*100 if ff_acwi_v2>0 else 0,
-            em_thr["Free Float MCap Y2025"].sum()/ff_acwi_v2*100 if ff_acwi_v2>0 else 0,
-        ]
-    })
-    fig_weights = px.bar(
-        weight_data, x="Variante", y="Weight (%)", color="Kategorie", barmode="stack",
-        color_discrete_map={"DM Weight":"#2979ff","EM Weight":"#ce93d8"},
-        template="plotly_dark", text_auto=".1f",
+    # ── DM/EM Weight Comparison (Adjusted Weights) ──────────────────────────
+    st.markdown("**DM vs EM Gewichtung (Adjusted Weights)**")
+
+    def _adj_ff(df):
+        return add_adjusted_weight(df, china_inclusion_factor)["Adjusted FF MCap"].sum()
+
+    _em_methods = {
+        f"EM Threshold ({em_threshold_pct}%)": em_thr,
+        f"EM Global {mid_thr}%": em_g85,
+        f"EM Per-Country {mid_thr}%": em_pc,
+    }
+    _weight_rows = []
+    for em_label, em_df in _em_methods.items():
+        for dm_label, dm_df in [("V1 (MSCI)", dm_world_v1), ("V2 (Solactive)", dm_world_v2)]:
+            _dm_adj = _adj_ff(dm_df)
+            _em_adj = _adj_ff(em_df)
+            _total  = _dm_adj + _em_adj
+            if _total > 0:
+                _weight_rows.append({
+                    "Variante": f"{dm_label} + {em_label}",
+                    "DM Weight (%)": round(_dm_adj / _total * 100, 2),
+                    "EM Weight (%)": round(_em_adj / _total * 100, 2),
+                })
+
+    _weight_df = pd.DataFrame(_weight_rows)
+    fig_weights = go.Figure()
+    fig_weights.add_bar(x=_weight_df["Variante"], y=_weight_df["DM Weight (%)"],
+                        name="DM", marker_color="#2979ff",
+                        text=_weight_df["DM Weight (%)"].apply(lambda x: f"{x:.2f}%"),
+                        textposition="inside")
+    fig_weights.add_bar(x=_weight_df["Variante"], y=_weight_df["EM Weight (%)"],
+                        name="EM", marker_color="#ce93d8",
+                        text=_weight_df["EM Weight (%)"].apply(lambda x: f"{x:.2f}%"),
+                        textposition="inside")
+    fig_weights.update_layout(
+        barmode="stack", template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+        height=360, margin=dict(t=10,b=120,l=60,r=10),
+        xaxis_tickangle=-25,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
-    fig_weights.update_layout(paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
-                               height=300, margin=dict(t=10,b=40,l=60,r=10))
     st.plotly_chart(fig_weights, use_container_width=True)
 
     # ── Per-Country ACWI Breakdown ───────────────────────────────────────────
