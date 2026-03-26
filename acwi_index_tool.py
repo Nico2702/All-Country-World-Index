@@ -962,7 +962,7 @@ with tab_acwi:
             </div>
             """, unsafe_allow_html=True)
 
-        em_col_label = f"EM Included (Total MCap ≥ {format_bn(em_min_mcap)})"
+        em_col_label = f"EM Included ({len(df_acwi_em):,} Stocks | Total MCap ≥ {format_bn(em_min_mcap)})"
 
         # Sensitivity chart
         st.markdown("**EM Sensitivity — Anzahl qualifizierter EM-Aktien je Threshold**")
@@ -1001,7 +1001,7 @@ with tab_acwi:
         </div>
         """, unsafe_allow_html=True)
 
-        em_col_label = f"EM Included (Global {mid_thr}%)"
+        em_col_label = f"EM Included ({len(df_acwi_em):,} Stocks | Global {mid_thr}%)"
 
     else:
         # ── Per-Country 85% approach ─────────────────────────────────────────
@@ -1034,7 +1034,7 @@ with tab_acwi:
                 })
             st.dataframe(pd.DataFrame(em_cutoffs), use_container_width=True, hide_index=True)
 
-        em_col_label = f"EM Included (Per-Country {mid_thr}%)"
+        em_col_label = f"EM Included ({len(df_acwi_em):,} Stocks | Per-Country {mid_thr}%)"
 
     total_acwi = len(df_acwi_dm) + len(df_acwi_em)
     total_ff_acwi = df_acwi_dm["Free Float MCap Y2025"].sum() + df_acwi_em["Free Float MCap Y2025"].sum()
@@ -1055,7 +1055,8 @@ with tab_acwi:
         s["Avg FF MCap (USD)"] = s["Avg FF MCap (USD)"].apply(format_bn)
         st.dataframe(s, use_container_width=True, hide_index=True)
 
-        st.markdown("**DM — Country Breakdown**")
+        _dm_cutoff_label = format_bn(cutoff_stock["Total MCap Y2025"]) if cutoff_stock is not None else "—"
+        st.markdown(f"**DM Included ({len(df_acwi_dm):,} Stocks | Total MCap ≥ {_dm_cutoff_label})**")
         dm_country_tbl = df_acwi_dm.groupby("Exchange Country Name").agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
