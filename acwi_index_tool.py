@@ -1112,14 +1112,22 @@ with tab_acwi:
 
         _dm_cutoff_label = format_bn(cutoff_stock["Total MCap Y2025"]) if cutoff_stock is not None else "—"
         st.markdown(f"**DM Included ({len(df_acwi_dm):,} Stocks | Total MCap ≥ {_dm_cutoff_label})**")
+        _all_dm_countries = sorted(df_dm["Exchange Country Name"].unique())
         dm_country_tbl = df_acwi_dm.groupby("Exchange Country Name").agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_Total_MCap=("Total MCap Y2025","mean"),
-        ).sort_values("FF_MCap", ascending=False).reset_index()
-        dm_country_tbl["FF MCap (USD)"] = dm_country_tbl["FF_MCap"].apply(format_bn)
-        dm_country_tbl["Avg Total MCap"] = dm_country_tbl["Avg_Total_MCap"].apply(format_bn)
-        dm_country_tbl["Weight (%)"] = (dm_country_tbl["FF_MCap"] / dm_country_tbl["FF_MCap"].sum() * 100).round(2)
+        ).reset_index()
+        _dm_all_c = pd.DataFrame({"Exchange Country Name": _all_dm_countries})
+        dm_country_tbl = _dm_all_c.merge(dm_country_tbl, on="Exchange Country Name", how="left")
+        dm_country_tbl["Stocks"] = dm_country_tbl["Stocks"].fillna(0).astype(int)
+        dm_country_tbl["FF_MCap"] = dm_country_tbl["FF_MCap"].fillna(0)
+        dm_country_tbl["Avg_Total_MCap"] = dm_country_tbl["Avg_Total_MCap"].fillna(0)
+        dm_country_tbl = dm_country_tbl.sort_values("FF_MCap", ascending=False)
+        _dm_ff_sum = dm_country_tbl["FF_MCap"].sum()
+        dm_country_tbl["FF MCap (USD)"] = dm_country_tbl["FF_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        dm_country_tbl["Avg Total MCap"] = dm_country_tbl["Avg_Total_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        dm_country_tbl["Weight (%)"] = dm_country_tbl["FF_MCap"].apply(lambda x: round(x / _dm_ff_sum * 100, 2) if _dm_ff_sum > 0 else 0)
         st.dataframe(dm_country_tbl[["Exchange Country Name","Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]],
                      use_container_width=True, hide_index=True)
 
@@ -1234,14 +1242,22 @@ with tab_acwi:
         )
 
         st.markdown(f"**{em_col_label}**")
+        _all_em_countries = sorted(df_em["Exchange Country Name"].unique())
         em_country = df_acwi_em.groupby("Exchange Country Name").agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_Total_MCap=("Total MCap Y2025","mean"),
-        ).sort_values("FF_MCap", ascending=False).reset_index()
-        em_country["FF MCap (USD)"] = em_country["FF_MCap"].apply(format_bn)
-        em_country["Avg Total MCap"] = em_country["Avg_Total_MCap"].apply(format_bn)
-        em_country["Weight (%)"] = (em_country["FF_MCap"] / em_country["FF_MCap"].sum() * 100).round(2)
+        ).reset_index()
+        _em_all_c = pd.DataFrame({"Exchange Country Name": _all_em_countries})
+        em_country = _em_all_c.merge(em_country, on="Exchange Country Name", how="left")
+        em_country["Stocks"] = em_country["Stocks"].fillna(0).astype(int)
+        em_country["FF_MCap"] = em_country["FF_MCap"].fillna(0)
+        em_country["Avg_Total_MCap"] = em_country["Avg_Total_MCap"].fillna(0)
+        em_country = em_country.sort_values("FF_MCap", ascending=False)
+        _em_ff_sum = em_country["FF_MCap"].sum()
+        em_country["FF MCap (USD)"] = em_country["FF_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        em_country["Avg Total MCap"] = em_country["Avg_Total_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        em_country["Weight (%)"] = em_country["FF_MCap"].apply(lambda x: round(x / _em_ff_sum * 100, 2) if _em_ff_sum > 0 else 0)
         st.dataframe(em_country[["Exchange Country Name","Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]],
                      use_container_width=True, hide_index=True)
 
