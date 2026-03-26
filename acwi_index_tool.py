@@ -582,6 +582,11 @@ if exclude_etf_sicav:
     _etf_pattern = re.compile(r'ETF|SICAV', re.IGNORECASE)
     df_raw = df_raw[~df_raw["Name"].fillna("").str.contains(_etf_pattern)].copy()
 
+# Thailand Sec Type filter
+_thailand_mask = df_raw["Exchange Name"].fillna("").str.upper() == "THAILAND"
+_excluded_type = "NVDR" if thailand_sec_type == "SHARE" else "SHARE"
+df_raw = df_raw[~(_thailand_mask & (df_raw["Sec Type"].fillna("") == _excluded_type))].copy()
+
 df_dm_full = df_raw[df_raw["Classification"] == "DM"].copy()
 df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
 
