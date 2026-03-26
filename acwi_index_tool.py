@@ -285,6 +285,15 @@ def add_adjusted_weight(df, china_factor=0.20):
     return df
 
 
+def style_segment_table(df, highlight_segs):
+    """Highlight key segment rows with a distinct background."""
+    def row_style(row):
+        if row["Segment"] in highlight_segs:
+            return ["background-color: #1a2a4a; font-weight: 600;"] * len(row)
+        return [""] * len(row)
+    return df.style.apply(row_style, axis=1)
+
+
 def segment_summary(df_seg):
     mask = df_seg["Segment"] != "Micro / Excluded"
     segments = ["Large Cap", "Mid Cap", "Small Cap"]
@@ -1089,7 +1098,11 @@ with tab_acwi:
             "FF MCap (USD)": format_bn(_dm_all["Free Float MCap Y2025"].sum()),
             "Avg FF MCap (USD)": format_bn(_dm_all["Free Float MCap Y2025"].mean()) if len(_dm_all) > 0 else "—",
         })
-        st.dataframe(pd.DataFrame(_dm_seg_rows), use_container_width=True, hide_index=True)
+        _dm_seg_df = pd.DataFrame(_dm_seg_rows)
+        st.dataframe(
+            style_segment_table(_dm_seg_df, ["Large Cap", "Mid Cap", "Total Stocks - World Index"]),
+            use_container_width=True, hide_index=True
+        )
 
         _dm_cutoff_label = format_bn(cutoff_stock["Total MCap Y2025"]) if cutoff_stock is not None else "—"
         st.markdown(f"**DM Included ({len(df_acwi_dm):,} Stocks | Total MCap ≥ {_dm_cutoff_label})**")
@@ -1208,7 +1221,11 @@ with tab_acwi:
             "FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].sum()),
             "Avg FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].mean()) if len(df_em) > 0 else "—",
         })
-        st.dataframe(pd.DataFrame(_em_seg_rows), use_container_width=True, hide_index=True)
+        _em_seg_df = pd.DataFrame(_em_seg_rows)
+        st.dataframe(
+            style_segment_table(_em_seg_df, ["Large Cap", "Mid Cap", "Total Stocks - EM"]),
+            use_container_width=True, hide_index=True
+        )
 
         st.markdown(f"**{em_col_label}**")
         em_country = df_acwi_em.groupby("Exchange Country Name").agg(
