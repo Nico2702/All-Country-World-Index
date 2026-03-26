@@ -1047,6 +1047,7 @@ with tab_acwi:
     c5.metric("EM Weight", f"{df_acwi_em['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.1f}%" if total_ff_acwi > 0 else "—")
 
     col_dm, col_em = st.columns(2)
+
     with col_dm:
         st.markdown("**DM Segments (World Index)**")
         s = segment_summary(df_dm_seg)
@@ -1054,7 +1055,35 @@ with tab_acwi:
         s["Avg FF MCap (USD)"] = s["Avg FF MCap (USD)"].apply(format_bn)
         st.dataframe(s, use_container_width=True, hide_index=True)
 
+        st.markdown("**DM — Country Breakdown**")
+        dm_country_tbl = df_acwi_dm.groupby("Exchange Country Name").agg(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_Total_MCap=("Total MCap Y2025","mean"),
+        ).sort_values("FF_MCap", ascending=False).reset_index()
+        dm_country_tbl["FF MCap (USD)"] = dm_country_tbl["FF_MCap"].apply(format_bn)
+        dm_country_tbl["Avg Total MCap"] = dm_country_tbl["Avg_Total_MCap"].apply(format_bn)
+        dm_country_tbl["Weight (%)"] = (dm_country_tbl["FF_MCap"] / dm_country_tbl["FF_MCap"].sum() * 100).round(2)
+        st.dataframe(dm_country_tbl[["Exchange Country Name","Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]],
+                     use_container_width=True, hide_index=True)
+
     with col_em:
+        st.markdown(f"**EM Segments**")
+        em_seg_summary = df_acwi_em.groupby("Segment").agg(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+        ).reset_index()
+        em_seg_summary["FF MCap (USD)"] = em_seg_summary["FF_MCap"].apply(format_bn)
+        em_seg_summary["Avg FF MCap (USD)"] = (df_acwi_em.groupby("Segment")["Free Float MCap Y2025"].mean()).apply(format_bn).reset_index(drop=True)
+        total_em_row = pd.DataFrame([{
+            "Segment": "Total Included",
+            "Stocks": len(df_acwi_em),
+            "FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].mean()),
+        }])
+        em_seg_display = pd.concat([em_seg_summary[["Segment","Stocks","FF MCap (USD)"]], total_em_row[["Segment","Stocks","FF MCap (USD)"]]], ignore_index=True)
+        st.dataframe(em_seg_display, use_container_width=True, hide_index=True)
+
         st.markdown(f"**{em_col_label}**")
         em_country = df_acwi_em.groupby("Exchange Country Name").agg(
             Stocks=("Symbol","count"),
