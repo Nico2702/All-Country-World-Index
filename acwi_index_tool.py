@@ -1244,22 +1244,25 @@ with tab_acwi:
 
     _acwi_all = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
     _total_stocks = len(_acwi_all)
-    _total_ff = _acwi_all["Free Float MCap Y2025"].sum()
 
-    _country_agg = _acwi_all.groupby(["Exchange Country Name","Classification"]).agg(
+    # Apply inclusion factor for Adjusted Weight
+    _acwi_all_adj = add_adjusted_weight(_acwi_all, china_inclusion_factor)
+
+    _country_agg = _acwi_all_adj.groupby(["Exchange Country Name","Classification"]).agg(
         Stocks=("Symbol","count"),
-        FF_MCap=("Free Float MCap Y2025","sum"),
+        Adj_MCap=("Adjusted FF MCap","sum"),
     ).reset_index()
     _country_agg["Stock %"] = (_country_agg["Stocks"] / _total_stocks * 100).round(2)
-    _country_agg["Weight %"] = (_country_agg["FF_MCap"] / _total_ff * 100).round(2)
+    _total_adj = _acwi_all_adj["Adjusted FF MCap"].sum()
+    _country_agg["Adj Weight %"] = (_country_agg["Adj_MCap"] / _total_adj * 100).round(2)
 
     _by_stocks = _country_agg.groupby("Exchange Country Name").agg(
         Stocks=("Stocks","sum"), Stock_Pct=("Stock %","sum")
     ).reset_index().sort_values("Stocks", ascending=True).tail(30)
 
     _by_weight = _country_agg.groupby("Exchange Country Name").agg(
-        FF_MCap=("FF_MCap","sum"), Weight_Pct=("Weight %","sum")
-    ).reset_index().sort_values("FF_MCap", ascending=True).tail(30)
+        Adj_MCap=("Adj_MCap","sum"), Weight_Pct=("Adj Weight %","sum")
+    ).reset_index().sort_values("Adj_MCap", ascending=True).tail(30)
 
     _col1, _col2 = st.columns(2)
 
