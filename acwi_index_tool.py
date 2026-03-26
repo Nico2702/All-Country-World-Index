@@ -1056,12 +1056,18 @@ with tab_acwi:
     total_acwi = len(df_acwi_dm) + len(df_acwi_em)
     total_ff_acwi = df_acwi_dm["Free Float MCap Y2025"].sum() + df_acwi_em["Free Float MCap Y2025"].sum()
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # Compute Adjusted EM Weight
+    _acwi_adj = add_adjusted_weight(pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True), china_inclusion_factor)
+    _total_adj_acwi = _acwi_adj["Adjusted FF MCap"].sum()
+    _em_adj_weight = _acwi_adj[_acwi_adj["Classification"] == "EM"]["Adjusted FF MCap"].sum() / _total_adj_acwi * 100 if _total_adj_acwi > 0 else 0
+
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("ACWI Total Stocks", f"{total_acwi:,}")
     c2.metric("ACWI FF MCap", format_bn(total_ff_acwi))
     c3.metric("DM Stocks (World)", f"{len(df_acwi_dm):,}")
     c4.metric("EM Stocks", f"{len(df_acwi_em):,}")
-    c5.metric("EM Weight", f"{df_acwi_em['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.1f}%" if total_ff_acwi > 0 else "—")
+    c5.metric("EM Weight", f"{df_acwi_em['Free Float MCap Y2025'].sum()/total_ff_acwi*100:.2f}%" if total_ff_acwi > 0 else "—")
+    c6.metric("Adj. EM Weight", f"{_em_adj_weight:.2f}%")
 
     col_dm, col_em = st.columns(2)
 
