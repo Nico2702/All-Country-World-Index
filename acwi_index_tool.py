@@ -200,8 +200,8 @@ def get_exclusion_reasons(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=Non
     reasons = []
     for idx, row in df.iterrows():
         r = []
-        if ff_gt0 and row["Free Float MCap Y2025"] <= 0:
-            r.append("FF MCap = 0")
+        if ff_gt0 and (pd.isna(row["Free Float MCap Y2025"]) or row["Free Float MCap Y2025"] <= 0):
+            r.append("FF MCap ≤ 0 or missing")
         if min_ff_pct > 0 and row["Free Float Percent"] < min_ff_pct:
             r.append(f"FF% < {min_ff_pct*100:.0f}%")
         if max_closing_price is not None and row["Closing Price"] > max_closing_price:
@@ -223,7 +223,7 @@ def get_exclusion_reasons(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=Non
 def apply_min_filters(df, ff_gt0=True, min_ff_pct=0.0, max_closing_price=None, min_adtv_1m=0, min_adtv_3m=0, min_adtv_6m=0, min_adtv_12m=0, min_liq_ratio=0.0):
     """Filter out stocks after segment computation."""
     mask = pd.Series(True, index=df.index)
-    if ff_gt0:                         mask &= df["Free Float MCap Y2025"] > 0
+    if ff_gt0:                         mask &= df["Free Float MCap Y2025"].notna() & (df["Free Float MCap Y2025"] > 0)
     if min_ff_pct  > 0:                mask &= df["Free Float Percent"] >= min_ff_pct
     if max_closing_price is not None:  mask &= df["Closing Price"] <= max_closing_price
     if min_adtv_1m  > 0:  mask &= df["1M ADTV Y2025"]  >= min_adtv_1m
@@ -435,10 +435,9 @@ with st.sidebar:
         help="Post: Filter nach der 85%-Cutoff Berechnung. Pre: Filter vor der Berechnung — beeinflusst die Segment-Zuordnung."
     )
 
-    ff_gt0 = st.checkbox("Free Float MCap > 0 (DM & EM)", value=True,
-        help="Schließt Aktien mit FF MCap = 0 für DM und EM aus.")
-    dm_ff_gt0 = ff_gt0
-    em_ff_gt0 = ff_gt0
+    # FF MCap > 0 is always applied as a fixed universe filter (not optional)
+    dm_ff_gt0 = True
+    em_ff_gt0 = True
 
     _ffa, _ffb = st.columns([3, 4])
     with _ffa:
@@ -563,6 +562,9 @@ if country_cls:
 if listing_filter == "Primary only":
     df_raw = df_raw[df_raw["Listing"] == "Primary"].copy()
 
+# ── Fixed Universe Filter: remove stocks with FF MCap <= 0 or missing ────────
+df_raw = df_raw[df_raw["Free Float MCap Y2025"].notna() & (df_raw["Free Float MCap Y2025"] > 0)].copy()
+
 # Exclude Hong Kong CNY stocks (Exchange Ticker contains HKG and Trading Currency = CNY)
 if exclude_hk_cny:
     hk_cny_mask = (df_raw["Exchange Ticker"].str.contains("HKG", na=False)) &                   (df_raw["Trading Currency"] == "CNY")
@@ -628,12 +630,10 @@ c5.metric("EM FF MCap", format_bn(df_em["Free Float MCap Y2025"].sum()))
 
 # Show active filter summary (post-segment filters)
 active_filters = []
-if dm_ff_gt0:           active_filters.append("DM FF MCap > 0")
 if dm_min_adtv_1m  > 0: active_filters.append(f"DM 1M ADTV ≥ {dm_min_adtv_1m:,.0f} USD")
 if dm_min_adtv_3m  > 0: active_filters.append(f"DM 3M ADTV ≥ {dm_min_adtv_3m:,.0f} USD")
 if dm_min_adtv_6m  > 0: active_filters.append(f"DM 6M ADTV ≥ {dm_min_adtv_6m:,.0f} USD")
 if dm_min_adtv_12m > 0: active_filters.append(f"DM 12M ADTV ≥ {dm_min_adtv_12m:,.0f} USD")
-if em_ff_gt0:           active_filters.append("EM FF MCap > 0")
 if em_min_adtv_1m  > 0: active_filters.append(f"EM 1M ADTV ≥ {em_min_adtv_1m:,.0f} USD")
 if em_min_adtv_3m  > 0: active_filters.append(f"EM 3M ADTV ≥ {em_min_adtv_3m:,.0f} USD")
 if em_min_adtv_6m  > 0: active_filters.append(f"EM 6M ADTV ≥ {em_min_adtv_6m:,.0f} USD")
