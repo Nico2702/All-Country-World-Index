@@ -1330,7 +1330,8 @@ with tab_acwi:
     # Apply inclusion factor for Adjusted Weight
     _acwi_all_adj = add_adjusted_weight(_acwi_all, china_inclusion_factor)
 
-    _country_agg = _acwi_all_adj.groupby(["Exchange Country Name","Classification"]).agg(
+    _country_col = "Mapping Country" if "Mapping Country" in _acwi_all_adj.columns else "Exchange Country Name"
+    _country_agg = _acwi_all_adj.groupby([_country_col,"Classification"]).agg(
         Stocks=("Symbol","count"),
         Adj_MCap=("Adjusted FF MCap","sum"),
     ).reset_index()
@@ -1338,13 +1339,13 @@ with tab_acwi:
     _total_adj = _acwi_all_adj["Adjusted FF MCap"].sum()
     _country_agg["Adj Weight %"] = (_country_agg["Adj_MCap"] / _total_adj * 100).round(2)
 
-    _by_stocks = _country_agg.groupby("Exchange Country Name").agg(
+    _by_stocks = _country_agg.groupby(_country_col).agg(
         Stocks=("Stocks","sum"), Stock_Pct=("Stock %","sum")
-    ).reset_index().sort_values("Stocks", ascending=True).tail(30)
+    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Stocks", ascending=True).tail(30)
 
-    _by_weight = _country_agg.groupby("Exchange Country Name").agg(
+    _by_weight = _country_agg.groupby(_country_col).agg(
         Adj_MCap=("Adj_MCap","sum"), Weight_Pct=("Adj Weight %","sum")
-    ).reset_index().sort_values("Adj_MCap", ascending=True).tail(30)
+    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Adj_MCap", ascending=True).tail(30)
 
     _col1, _col2 = st.columns(2)
 
