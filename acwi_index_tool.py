@@ -1069,20 +1069,25 @@ with tab_acwi:
 
     with col_em:
         st.markdown(f"**EM Segments**")
-        em_seg_summary = df_acwi_em.groupby("Segment").agg(
-            Stocks=("Symbol","count"),
-            FF_MCap=("Free Float MCap Y2025","sum"),
-        ).reset_index()
-        em_seg_summary["FF MCap (USD)"] = em_seg_summary["FF_MCap"].apply(format_bn)
-        em_seg_summary["Avg FF MCap (USD)"] = (df_acwi_em.groupby("Segment")["Free Float MCap Y2025"].mean()).apply(format_bn).reset_index(drop=True)
-        total_em_row = pd.DataFrame([{
+        # Apply DM-style Large/Mid/Small segmentation to EM universe
+        _em_for_seg = compute_variant1(df_acwi_em, large_thr, mid_thr, small_thr)
+        _em_seg_rows = []
+        for seg in ["Large Cap", "Mid Cap", "Small Cap"]:
+            _s = _em_for_seg[_em_for_seg["Segment"] == seg]
+            _em_seg_rows.append({
+                "Segment": seg,
+                "# Stocks": len(_s),
+                "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—",
+            })
+        _em_total = _em_for_seg[_em_for_seg["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])]
+        _em_seg_rows.append({
             "Segment": "Total Included",
-            "Stocks": len(df_acwi_em),
+            "# Stocks": len(df_acwi_em),
             "FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].sum()),
-            "Avg FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].mean()),
-        }])
-        em_seg_display = pd.concat([em_seg_summary[["Segment","Stocks","FF MCap (USD)"]], total_em_row[["Segment","Stocks","FF MCap (USD)"]]], ignore_index=True)
-        st.dataframe(em_seg_display, use_container_width=True, hide_index=True)
+            "Avg FF MCap (USD)": format_bn(df_acwi_em["Free Float MCap Y2025"].mean()) if len(df_acwi_em) > 0 else "—",
+        })
+        st.dataframe(pd.DataFrame(_em_seg_rows), use_container_width=True, hide_index=True)
 
         st.markdown(f"**{em_col_label}**")
         em_country = df_acwi_em.groupby("Exchange Country Name").agg(
