@@ -1324,13 +1324,20 @@ with tab_acwi:
     # ── Country Charts ───────────────────────────────────────────────────────
     st.markdown("**ACWI — Länderübersicht**")
 
+    # Country basis selector
+    _available_bases = ["Mapping Country", "Country of Incorp", "Exchange Country Name"]
+    _available_bases = [b for b in _available_bases if b in pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True).columns]
+    _country_basis = st.radio("Länder-Basis:", _available_bases, index=0,
+        horizontal=True, key="country_basis_radio",
+        help="Mapping Country: Exchange wenn gleich Incorp, sonst Country of Risk. Country of Incorp: Gründungsland. Exchange Country Name: Börsenland.")
+
     _acwi_all = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
     _total_stocks = len(_acwi_all)
 
     # Apply inclusion factor for Adjusted Weight
     _acwi_all_adj = add_adjusted_weight(_acwi_all, china_inclusion_factor)
 
-    _country_col = "Mapping Country" if "Mapping Country" in _acwi_all_adj.columns else "Exchange Country Name"
+    _country_col = _country_basis if _country_basis in _acwi_all_adj.columns else "Exchange Country Name"
     _country_agg = _acwi_all_adj.groupby([_country_col,"Classification"]).agg(
         Stocks=("Symbol","count"),
         Adj_MCap=("Adjusted FF MCap","sum"),
