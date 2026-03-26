@@ -597,7 +597,7 @@ st.markdown("---")
 tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
     "🌍 Universe Overview",
     "📐 Variant 1 — Global DM Thresholds",
-    "🗺️ Variant 2 — Per-Country DM Thresholds",
+    "🗺️ Variant 2 — Per-Country / Solactive DM Thresholds",
     "🌐 ACWI (DM + EM)",
     "⚖️ Variant Comparison (World)",
     "🔀 ACWI Comparison (V1 vs V2)",
@@ -826,7 +826,7 @@ with tab_v1:
 # TAB 3: VARIANT 2 — PER-COUNTRY DM THRESHOLDS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_v2:
-    st.subheader("Variant 2 — Per-Country DM Thresholds")
+    st.subheader("Variant 2 — Per-Country / Solactive DM Thresholds")
     st.markdown(f"""
     <div class="info-box">
     <b>Methodik:</b> Das Prozedere aus Variant 1 wird für <b>jedes DM-Land separat</b> angewendet.
@@ -927,7 +927,7 @@ with tab_v2:
 with tab_acwi:
     st.subheader("ACWI — All Country World Index (DM + EM)")
 
-    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global)", "Variant 2 (Per-Country)"], horizontal=True)
+    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global)", "Variant 2 (Per-Country / Solactive)"], horizontal=True)
 
     if acwi_variant == "Variant 1 (Global)":
         df_dm_seg = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
@@ -935,7 +935,7 @@ with tab_acwi:
         df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
 
     # ── EM Method Selection ──────────────────────────────────────────────────
-    if acwi_variant == "Variant 2 (Per-Country)":
+    if acwi_variant == "Variant 2 (Per-Country / Solactive)":
         em_method = "Per-Country 85% (wie DM Variant 2)"
         st.markdown("""<div class="info-box">
         <b>EM Methodik:</b> Per-Country 85% (wie DM Variant 2) &nbsp;—&nbsp;
@@ -1213,14 +1213,14 @@ with tab_acwi:
                 "FF MCap (USD)": format_bn(_em_sc["Free Float MCap Y2025"].sum()),
                 "Avg FF MCap (USD)": format_bn(_em_sc["Free Float MCap Y2025"].mean()) if len(_em_sc) > 0 else "—",
             })
-        # Total Universe — all EM stocks that have a segment (above + small cap)
-        _em_universe_total = len(df_em_result[df_em_result["Free Float MCap Y2025"] > 0]) if "df_em_result" in dir() else len(df_acwi_em)
-        _em_seg_rows.append({
-            "Segment": "Total Universe",
-            "# Stocks": len(df_em),
-            "FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].sum()),
-            "Avg FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].mean()) if len(df_em) > 0 else "—",
-        })
+        # Total Universe only added for Threshold method (already added inside em_has_segments block)
+        if not em_has_segments:
+            _em_seg_rows.append({
+                "Segment": "Total Universe",
+                "# Stocks": len(df_em),
+                "FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": format_bn(df_em["Free Float MCap Y2025"].mean()) if len(df_em) > 0 else "—",
+            })
         _em_seg_df = pd.DataFrame(_em_seg_rows)
         st.dataframe(
             style_segment_table(_em_seg_df, ["Large Cap", "Mid Cap", "Total Stocks - EM"]),
