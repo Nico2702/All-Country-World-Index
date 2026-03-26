@@ -1087,20 +1087,22 @@ with tab_acwi:
     with col_em:
         st.markdown(f"**EM Segments**")
         if em_has_segments:
-            # Global 85% or Per-Country 85%: only Large + Mid exist, no Small Cap
+            # Global 85% or Per-Country 85%: only Large + Mid exist, Small Cap shown as empty
             _em_seg_rows = []
             for seg in ["Large Cap", "Mid Cap"]:
-                _s = df_acwi_em[df_acwi_em["Segment"] == seg] if "Segment" in df_acwi_em.columns and seg in df_acwi_em["Segment"].values else df_acwi_em
-                if seg == "Large Cap":
-                    _s = df_acwi_em[df_acwi_em["Segment"] == "Large Cap"] if "Segment" in df_acwi_em.columns else pd.DataFrame()
-                else:
-                    _s = df_acwi_em[df_acwi_em["Segment"] == "Mid Cap"] if "Segment" in df_acwi_em.columns else pd.DataFrame()
+                _s = df_acwi_em[df_acwi_em["Segment"] == seg] if "Segment" in df_acwi_em.columns else pd.DataFrame()
                 _em_seg_rows.append({
                     "Segment": seg,
                     "# Stocks": len(_s),
                     "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()) if len(_s) > 0 else "—",
                     "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—",
                 })
+            _em_seg_rows.append({
+                "Segment": "Small Cap",
+                "# Stocks": "—",
+                "FF MCap (USD)": "—",
+                "Avg FF MCap (USD)": "—",
+            })
         else:
             # Threshold: rank within qualified EM stocks and assign Large/Mid/Small
             _em_ranked = df_acwi_em.sort_values("Total MCap Y2025", ascending=False).copy()
