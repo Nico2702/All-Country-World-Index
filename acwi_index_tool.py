@@ -1352,13 +1352,29 @@ with tab_acwi:
     _total_adj = _acwi_all_adj["Adjusted FF MCap"].sum()
     _country_agg["Adj Weight %"] = (_country_agg["Adj_MCap"] / _total_adj * 100).round(2)
 
-    _by_stocks = _country_agg.groupby(_country_col).agg(
+    _by_stocks_full = _country_agg.groupby(_country_col).agg(
         Stocks=("Stocks","sum"), Stock_Pct=("Stock %","sum")
-    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Stocks", ascending=True).tail(30)
+    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Stocks", ascending=False)
 
-    _by_weight = _country_agg.groupby(_country_col).agg(
+    _by_weight_full = _country_agg.groupby(_country_col).agg(
         Adj_MCap=("Adj_MCap","sum"), Weight_Pct=("Adj Weight %","sum")
-    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Adj_MCap", ascending=True).tail(30)
+    ).reset_index().rename(columns={_country_col:"Exchange Country Name"}).sort_values("Adj_MCap", ascending=False)
+
+    # Top 30 + Others
+    def _add_others(df, val_col, pct_col, n=30):
+        top = df.head(n).copy()
+        rest = df.iloc[n:]
+        if len(rest) > 0:
+            others = pd.DataFrame([{
+                "Exchange Country Name": f"Others ({len(rest)} Länder)",
+                val_col: rest[val_col].sum(),
+                pct_col: rest[pct_col].sum(),
+            }])
+            top = pd.concat([others, top], ignore_index=True)
+        return top.sort_values(val_col, ascending=True)
+
+    _by_stocks = _add_others(_by_stocks_full, "Stocks", "Stock_Pct")
+    _by_weight = _add_others(_by_weight_full, "Adj_MCap", "Weight_Pct")
 
     _col1, _col2 = st.columns(2)
 
