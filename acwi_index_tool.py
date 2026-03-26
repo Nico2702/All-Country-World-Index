@@ -1291,7 +1291,7 @@ with tab_acwi:
             y=_by_weight["Exchange Country Name"],
             orientation="h",
             marker_color="#ce93d8",
-            text=_by_weight["Weight_Pct"].apply(lambda x: f"{x:.1f}%"),
+            text=_by_weight["Weight_Pct"].apply(lambda x: f"{x:.2f}%"),
             textposition="outside",
         ))
         fig_weight.update_layout(
