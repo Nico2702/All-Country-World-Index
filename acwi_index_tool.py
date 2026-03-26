@@ -382,6 +382,14 @@ with st.sidebar:
     listing_filter = st.radio("Listing Type", ["Primary only", "All (Primary + Secondary)"], index=1)
     exclude_hk_cny = st.checkbox("Exclude Hong Kong (CNY)", value=True,
         help="Schließt alle Aktien aus, wo Exchange Ticker = HKG und Trading Currency = CNY.")
+    exclude_country_risk_na = st.checkbox("Exclude Country of Risk = @", value=True,
+        help="Schließt Aktien aus, wo Country of Risk = '@' (nicht zugewiesen).")
+    exclude_naics_funds = st.checkbox("Exclude NAICS = Open-End Investment Funds", value=True,
+        help="Schließt Investmentfonds aus.")
+    exclude_euro_mtf = st.checkbox("Exclude Exchange = Euro MTF / @", value=True,
+        help="Schließt Aktien aus, wo Exchange Name = 'Euro MTF' oder '@'.")
+    exclude_etf_sicav = st.checkbox("Exclude Name enthält ETF / SICAV", value=True,
+        help="Schließt Aktien aus, wo der Name das eigenständige Wort 'ETF' oder 'SICAV' enthält.")
 
     st.markdown("**DM Percentile Thresholds**")
     _la, _lb = st.columns([3, 4])
@@ -554,6 +562,24 @@ if listing_filter == "Primary only":
 if exclude_hk_cny:
     hk_cny_mask = (df_raw["Exchange Ticker"].str.contains("HKG", na=False)) &                   (df_raw["Trading Currency"] == "CNY")
     df_raw = df_raw[~hk_cny_mask].copy()
+
+# Exclude Country of Risk = @
+if exclude_country_risk_na and "Country of Risk" in df_raw.columns:
+    df_raw = df_raw[df_raw["Country of Risk"].fillna("") != "@"].copy()
+
+# Exclude NAICS = Open-End Investment Funds
+if exclude_naics_funds and "NAICS" in df_raw.columns:
+    df_raw = df_raw[~df_raw["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False)].copy()
+
+# Exclude Exchange Name = Euro MTF or @
+if exclude_euro_mtf:
+    df_raw = df_raw[~df_raw["Exchange Name"].fillna("").isin(["Euro MTF", "@"])].copy()
+
+# Exclude Name contains standalone word ETF or SICAV
+if exclude_etf_sicav:
+    import re
+    _etf_pattern = re.compile(r'ETF|SICAV', re.IGNORECASE)
+    df_raw = df_raw[~df_raw["Name"].fillna("").str.contains(_etf_pattern)].copy()
 
 df_dm_full = df_raw[df_raw["Classification"] == "DM"].copy()
 df_em_full = df_raw[df_raw["Classification"] == "EM"].copy()
