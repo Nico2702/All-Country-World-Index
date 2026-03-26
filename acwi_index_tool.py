@@ -391,6 +391,12 @@ with st.sidebar:
             help="Exchange Name ist 'Euro MTF' oder '@'")
         exclude_etf_sicav = st.checkbox("Name: ETF / SICAV", value=True,
             help="Name enthält eigenständiges Wort 'ETF' oder 'SICAV'")
+        st.divider()
+        st.markdown("**Thailand Sec Type**")
+        thailand_sec_type = st.radio("", ["SHARE", "NVDR"], index=1,
+            horizontal=True, key="thailand_sec_type",
+            label_visibility="collapsed",
+            help="Für Thailand: welcher Sec Type wird berücksichtigt? Der andere wird excludiert.")
 
     st.markdown("**DM Percentile Thresholds**")
     _la, _lb = st.columns([3, 4])
