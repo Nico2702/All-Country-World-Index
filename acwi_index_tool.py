@@ -926,16 +926,21 @@ with tab_acwi:
         df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
 
     # ── EM Method Selection ──────────────────────────────────────────────────
-    em_method = st.radio(
-        "EM Methodik:",
-        [
-            "Threshold (% des DM Grenzstocks)",
-            "Global 85% (wie DM Variant 1)",
-            "Per-Country 85% (wie DM Variant 2)",
-        ],
-        horizontal=True,
-        help="Threshold: Mindest-MCap relativ zum DM-Grenzstock. Global 85%: alle EM global sortiert, Top-85% FF MCap. Per-Country: 85% pro EM-Land."
-    )
+    if acwi_variant == "Variant 2 (Per-Country)":
+        em_method = "Per-Country 85% (wie DM Variant 2)"
+        st.markdown("""<div class="info-box">
+        <b>EM Methodik:</b> Per-Country 85% (wie DM Variant 2) &nbsp;—&nbsp;
+        automatisch gewählt da DM Variant 2 aktiv ist.</div>""", unsafe_allow_html=True)
+    else:
+        em_method = st.radio(
+            "EM Methodik:",
+            [
+                "Threshold (% des DM Grenzstocks)",
+                "Global 85% (wie DM Variant 1)",
+            ],
+            horizontal=True,
+            help="Threshold: Mindest-MCap relativ zum DM-Grenzstock. Global 85%: alle EM global sortiert, Top-85% FF MCap."
+        )
 
     # ── DM Cutoff Stock — always use global V1 cutoff as EM threshold reference ──
     dm_seg_v1_ref = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
