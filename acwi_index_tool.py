@@ -520,25 +520,25 @@ with st.sidebar:
         _info = "<span title='Adjusted FF MCap = FF MCap × Factor. Adjusted Weight = Adjusted FF MCap / Σ Adjusted FF MCap aller Index-Stocks.' style='cursor:help;color:#8892b0;font-size:13px;'>ⓘ</span>"
 
         _cna, _cnb = st.columns([3, 4])
-        with _cna: use_china_factor = st.checkbox(f"China A-Shares {_info}", value=True, key="use_china_factor")
+        with _cna: use_china_factor = st.checkbox("China A-Shares", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_china_factor")
         with _cnb: china_factor_raw = st.text_input("China", value="20", key="china_factor_input", label_visibility="collapsed", disabled=not use_china_factor)
         try:    china_inclusion_factor = float(china_factor_raw) / 100 if use_china_factor else 1.0
         except: china_inclusion_factor = 0.20
 
         _ina, _inb = st.columns([3, 4])
-        with _ina: use_india_factor = st.checkbox(f"Indien {_info}", value=True, key="use_india_factor")
-        with _inb: india_factor_raw = st.text_input("Indien", value="50", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
+        with _ina: use_india_factor = st.checkbox("Indien", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_india_factor")
+        with _inb: india_factor_raw = st.text_input("Indien", value="75", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
         try:    india_inclusion_factor = float(india_factor_raw) / 100 if use_india_factor else 1.0
         except: india_inclusion_factor = 0.50
 
         _vna, _vnb = st.columns([3, 4])
-        with _vna: use_vietnam_factor = st.checkbox(f"Vietnam {_info}", value=True, key="use_vietnam_factor")
+        with _vna: use_vietnam_factor = st.checkbox("Vietnam", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_vietnam_factor")
         with _vnb: vietnam_factor_raw = st.text_input("Vietnam", value="50", key="vietnam_factor_input", label_visibility="collapsed", disabled=not use_vietnam_factor)
         try:    vietnam_inclusion_factor = float(vietnam_factor_raw) / 100 if use_vietnam_factor else 1.0
         except: vietnam_inclusion_factor = 0.50
 
         _saa, _sab = st.columns([3, 4])
-        with _saa: use_saudi_factor = st.checkbox(f"Saudi-Arabien {_info}", value=True, key="use_saudi_factor")
+        with _saa: use_saudi_factor = st.checkbox("Saudi-Arabien", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_saudi_factor")
         with _sab: saudi_factor_raw = st.text_input("Saudi-Arabien", value="50", key="saudi_factor_input", label_visibility="collapsed", disabled=not use_saudi_factor)
         try:    saudi_inclusion_factor = float(saudi_factor_raw) / 100 if use_saudi_factor else 1.0
         except: saudi_inclusion_factor = 0.50
@@ -1491,13 +1491,64 @@ with tab_acwi:
     if em_ff_total > 0: acwi_summary.append({"Label": "EM Included", "FF MCap": em_ff_total, "Type": "EM"})
     acwi_df_summary = pd.DataFrame(acwi_summary)
 
-    fig_acwi = px.pie(
-        acwi_df_summary, names="Label", values="FF MCap",
-        color="Type", color_discrete_map={"DM": "#2979ff", "EM": "#ce93d8"},
-        template="plotly_dark", hole=0.45,
-    )
-    fig_acwi.update_layout(paper_bgcolor="#0f1117", height=350, margin=dict(t=10,b=10))
-    st.plotly_chart(fig_acwi, use_container_width=True)
+    _col_pie, _col_if = st.columns([1, 1])
+    with _col_pie:
+        fig_acwi = px.pie(
+            acwi_df_summary, names="Label", values="FF MCap",
+            color="Type", color_discrete_map={"DM": "#2979ff", "EM": "#ce93d8"},
+            template="plotly_dark", hole=0.45,
+        )
+        fig_acwi.update_layout(paper_bgcolor="#0f1117", height=350, margin=dict(t=10,b=10))
+        st.plotly_chart(fig_acwi, use_container_width=True)
+
+    with _col_if:
+        st.markdown("**Inclusion Factor Impact**")
+        # Build full ACWI for weight comparison
+        _acwi_full = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
+        _total_ff_raw = _acwi_full["Free Float MCap Y2025"].sum()
+        _acwi_full_adj = add_adjusted_weight(_acwi_full, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        _total_adj = _acwi_full_adj["Adjusted FF MCap"].sum()
+
+        # Countries with inclusion factor != 1
+        _if_map = {
+            "China A-Shares": (["SHANGHAI","SHENZHEN"], china_inclusion_factor),
+            "Indien":         (["BSE INDIA","NSE INDIA"], india_inclusion_factor),
+            "Vietnam":        (["HANOI STOCK EXCHANGE","VIETNAM"], vietnam_inclusion_factor),
+            "Saudi-Arabien":  (["SAUDI ARABIA"], saudi_inclusion_factor),
+        }
+        _if_rows = []
+        for name, (exchanges, factor) in _if_map.items():
+            _mask = _acwi_full["Exchange Name"].isin(exchanges)
+            _ff = _acwi_full.loc[_mask, "Free Float MCap Y2025"].sum()
+            _adj = _ff * factor
+            if _total_ff_raw > 0 and _ff > 0:
+                _w_before = _ff / _total_ff_raw * 100
+                _w_after  = _adj / _total_adj * 100
+                _if_rows.append({
+                    "Land": name,
+                    "Factor": f"{factor*100:.0f}%",
+                    "Weight (vor)": round(_w_before, 4),
+                    "Weight (nach)": round(_w_after, 4),
+                    "Δ": round(_w_after - _w_before, 4),
+                })
+
+        if _if_rows:
+            _if_df = pd.DataFrame(_if_rows)
+            # Total row
+            _total_row = pd.DataFrame([{
+                "Land": "Total Weight",
+                "Factor": "—",
+                "Weight (vor)": round(_if_df["Weight (vor)"].sum(), 4),
+                "Weight (nach)": round(_if_df["Weight (nach)"].sum(), 4),
+                "Δ": round(_if_df["Δ"].sum(), 4),
+            }])
+            _if_df = pd.concat([_if_df, _total_row], ignore_index=True)
+            st.dataframe(
+                style_segment_table(_if_df, ["Total Weight"]),
+                use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("Keine aktiven Inclusion Factors.")
 
     # ── Download ─────────────────────────────────────────────────────────────
     _fp_dm_acwi = dict(ff_gt0=dm_ff_gt0, min_ff_pct=min_ff_pct, max_closing_price=max_closing_price,
