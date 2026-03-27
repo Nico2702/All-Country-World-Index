@@ -529,7 +529,7 @@ with st.sidebar:
         with _ina: use_india_factor = st.checkbox("Indien", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_india_factor")
         with _inb: india_factor_raw = st.text_input("Indien", value="75", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
         try:    india_inclusion_factor = float(india_factor_raw) / 100 if use_india_factor else 1.0
-        except: india_inclusion_factor = 0.50
+        except: india_inclusion_factor = 0.75
 
         _vna, _vnb = st.columns([4, 2])
         with _vna: use_vietnam_factor = st.checkbox("Vietnam", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_vietnam_factor")
