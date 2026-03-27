@@ -401,15 +401,15 @@ with st.sidebar:
 
 
     st.markdown("**DM Percentile Thresholds**")
-    _la, _lb = st.columns([4, 2])
+    _la, _lb = st.columns([3, 4])
     with _la: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Large Cap (%)</div>", unsafe_allow_html=True)
     with _lb:
         _large_raw = st.text_input("Large Cap", value="70", key="large_thr_input", label_visibility="collapsed")
-    _ma, _mb = st.columns([4, 2])
+    _ma, _mb = st.columns([3, 4])
     with _ma: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Mid Cap (%)</div>", unsafe_allow_html=True)
     with _mb:
         _mid_raw = st.text_input("Mid Cap", value="85", key="mid_thr_input", label_visibility="collapsed")
-    _sa, _sb = st.columns([4, 2])
+    _sa, _sb = st.columns([3, 4])
     with _sa: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Small Cap (%)</div>", unsafe_allow_html=True)
     with _sb:
         _small_raw = st.text_input("Small Cap", value="99", key="small_thr_input", label_visibility="collapsed")
@@ -422,7 +422,7 @@ with st.sidebar:
 
     st.markdown("**EM Parameters (ACWI Threshold)**")
     st.caption("EM-Aktien müssen mindestens X% des Total MCap des letzten DM-Grenzstocks (85%-Cutoff) erreichen.")
-    _ema, _emb = st.columns([4, 2])
+    _ema, _emb = st.columns([3, 4])
     with _ema: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min MCap (%)</div>", unsafe_allow_html=True)
     with _emb:
         _em_thr_raw = st.text_input("EM Min MCap", value="33.3", key="em_threshold_input", label_visibility="collapsed")
@@ -443,7 +443,7 @@ with st.sidebar:
     dm_ff_gt0 = True
     em_ff_gt0 = True
 
-    _ffa, _ffb = st.columns([4, 2])
+    _ffa, _ffb = st.columns([3, 4])
     with _ffa:
         use_ff_pct = st.checkbox("FF% ≥", value=True, key="use_ff_pct",
             help="Schließt Aktien aus deren Free Float Percent unter dem Threshold liegt.")
@@ -453,7 +453,7 @@ with st.sidebar:
     try:    min_ff_pct = float(ff_pct_thr) / 100 if use_ff_pct else 0.0
     except: min_ff_pct = 0.0
 
-    _cpa, _cpb = st.columns([4, 2])
+    _cpa, _cpb = st.columns([3, 4])
     with _cpa:
         use_max_price = st.checkbox("Price ≤", value=True, key="use_max_price",
             help="Schließt Aktien aus deren Closing Price über dem Threshold liegt.")
@@ -469,16 +469,16 @@ with st.sidebar:
 
     with st.expander("ADTV (Threshold)", expanded=False):
         st.markdown("**Developed Markets (DM)**")
-        _dma, _dmb = st.columns([4, 2])
+        _dma, _dmb = st.columns([3, 4])
         with _dma: dm_use_1m  = st.checkbox("1M",  value=False, key="dm_use_1m")
         with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="1,500,000", key="dm_1m", label_visibility="collapsed", disabled=not dm_use_1m))
-        _dme, _dmf = st.columns([4, 2])
+        _dme, _dmf = st.columns([3, 4])
         with _dme: dm_use_3m  = st.checkbox("3M",  value=False, key="dm_use_3m")
         with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="1,500,000", key="dm_3m", label_visibility="collapsed", disabled=not dm_use_3m))
-        _dma2, _dmb2 = st.columns([4, 2])
+        _dma2, _dmb2 = st.columns([3, 4])
         with _dma2: dm_use_6m  = st.checkbox("6M",  value=True, key="dm_use_6m")
         with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="1,500,000", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
-        _dmc, _dmd = st.columns([4, 2])
+        _dmc, _dmd = st.columns([3, 4])
         with _dmc: dm_use_12m = st.checkbox("12M", value=True, key="dm_use_12m")
         with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="1,500,000", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
         if not dm_use_1m:  dm_min_adtv_1m  = 0
@@ -487,16 +487,16 @@ with st.sidebar:
         if not dm_use_12m: dm_min_adtv_12m = 0
 
         st.markdown("**Emerging Markets (EM)**")
-        _ema0, _emb0 = st.columns([4, 2])
+        _ema0, _emb0 = st.columns([3, 4])
         with _ema0: em_use_1m  = st.checkbox("1M",  value=False, key="em_use_1m")
         with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="750,000", key="em_1m", label_visibility="collapsed", disabled=not em_use_1m))
-        _eme, _emf = st.columns([4, 2])
+        _eme, _emf = st.columns([3, 4])
         with _eme: em_use_3m  = st.checkbox("3M",  value=False, key="em_use_3m")
         with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="750,000", key="em_3m", label_visibility="collapsed", disabled=not em_use_3m))
-        _ema, _emb = st.columns([4, 2])
+        _ema, _emb = st.columns([3, 4])
         with _ema: em_use_6m  = st.checkbox("6M",  value=True, key="em_use_6m")
         with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="750,000", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
-        _emc, _emd = st.columns([4, 2])
+        _emc, _emd = st.columns([3, 4])
         with _emc: em_use_12m = st.checkbox("12M", value=True, key="em_use_12m")
         with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="750,000", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
         if not em_use_1m:  em_min_adtv_1m  = 0
@@ -506,7 +506,7 @@ with st.sidebar:
 
         st.divider()
         st.markdown("""**Liquidity Ratio %** <span title="(12M ADTV / FF MCap) × 252" style="cursor:help;color:#8892b0;font-size:13px;">ⓘ</span>""", unsafe_allow_html=True)
-        _lqa, _lqb = st.columns([4, 2])
+        _lqa, _lqb = st.columns([3, 4])
         with _lqa: use_liq_ratio = st.checkbox("aktiv", value=True, key="use_liq_ratio")
         with _lqb:
             liq_ratio_thr = st.text_input("Min. %", value="10", key="liq_ratio_thr",
