@@ -1172,15 +1172,78 @@ with tab_v3:
         v3_gmsr_pct, v3_em_gmsr_ratio, v3_auto_mult, v3_cand_mult, v3_buf_mult
     )
 
-    # Key metrics
-    st.markdown(f"""
-    <div class="info-box">
-    <b>EUMSS_FULL:</b> {format_bn(_v3_eumss_full)} &nbsp;|&nbsp;
-    <b>EUMSS_FF:</b> {format_bn(_v3_eumss_ff)} &nbsp;|&nbsp;
-    <b>DM GMSR:</b> {format_bn(_v3_dm_gmsr)} &nbsp;|&nbsp;
-    <b>EM GMSR:</b> {format_bn(_v3_em_gmsr)}
-    </div>
-    """, unsafe_allow_html=True)
+    # Key metrics — EUMSS cards
+    _km1, _km2, _km3, _km4 = st.columns(4)
+    _km1.metric("EUMSS_FULL (Total MCap Min.)", format_bn(_v3_eumss_full))
+    _km2.metric("EUMSS_FF (FF MCap Min.)",      format_bn(_v3_eumss_ff))
+    _km3.metric("DM GMSR (85% Cutoff)",         format_bn(_v3_dm_gmsr))
+    _km4.metric("EM GMSR (50% × DM GMSR)",      format_bn(_v3_em_gmsr))
+
+    # GMSR cards + zone matrix
+    st.markdown("---")
+    _gc1, _gc2 = st.columns(2)
+    with _gc1:
+        st.markdown(f"""
+        <div style="background:#1a2a4a;border-radius:8px;padding:16px 20px;margin-bottom:8px;">
+        <div style="color:#8892b0;font-size:12px;font-weight:600;letter-spacing:1px;">DM GMSR — Standard Index</div>
+        <div style="color:#e8eaf6;font-size:28px;font-weight:700;margin:6px 0;">{format_bn(_v3_dm_gmsr)} USD</div>
+        <div style="color:#8892b0;font-size:12px;">Kalibriert: 85% DM Free Float MCap Cutoff</div>
+        </div>""", unsafe_allow_html=True)
+    with _gc2:
+        st.markdown(f"""
+        <div style="background:#1a2a4a;border-radius:8px;padding:16px 20px;margin-bottom:8px;">
+        <div style="color:#8892b0;font-size:12px;font-weight:600;letter-spacing:1px;">EM GMSR — Standard Index</div>
+        <div style="color:#e8eaf6;font-size:28px;font-weight:700;margin:6px 0;">{format_bn(_v3_em_gmsr)} USD</div>
+        <div style="color:#8892b0;font-size:12px;">= {v3_em_gmsr_ratio*100:.0f}% × DM GMSR — fixer Abschlag (kein eigener Kalibrator)</div>
+        </div>""", unsafe_allow_html=True)
+
+    # Zone matrix table
+    st.markdown("**ZONENTABELLE — FULL MARKET CAP VS. GMSR**")
+    _zone_matrix_html = f"""
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="background:#0f1117;color:#8892b0;text-align:left;">
+        <th style="padding:8px 12px;">Zone</th>
+        <th style="padding:8px 12px;">Multiplikator</th>
+        <th style="padding:8px 12px;">DM Schwelle</th>
+        <th style="padding:8px 12px;">EM Schwelle</th>
+        <th style="padding:8px 12px;">Tool-Logik</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#0d2137;">
+        <td style="padding:10px 12px;color:#42a5f5;font-weight:700;">Auto-Include</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&gt; {v3_auto_mult}× GMSR</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&gt; {format_bn(_v3_dm_gmsr * v3_auto_mult)}</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&gt; {format_bn(_v3_em_gmsr * v3_auto_mult)}</td>
+        <td style="padding:10px 12px;color:#8892b0;">Aufgenommen — restliche Screens trotzdem prüfen (ADTV, FF%)</td>
+      </tr>
+      <tr style="background:#0d3320;">
+        <td style="padding:10px 12px;color:#66bb6a;font-weight:700;">Kandidat</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{v3_cand_mult}× – {v3_auto_mult}× GMSR</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{format_bn(_v3_dm_gmsr * v3_cand_mult)} – {format_bn(_v3_dm_gmsr * v3_auto_mult)}</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{format_bn(_v3_em_gmsr * v3_cand_mult)} – {format_bn(_v3_em_gmsr * v3_auto_mult)}</td>
+        <td style="padding:10px 12px;color:#8892b0;">Eligible — weiter zu Schritt 7 (85% Segmentation)</td>
+      </tr>
+      <tr style="background:#2d1f00;">
+        <td style="padding:10px 12px;color:#ffa726;font-weight:700;">Pufferzone</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{v3_buf_mult}× – {v3_cand_mult}× GMSR</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{format_bn(_v3_dm_gmsr * v3_buf_mult)} – {format_bn(_v3_dm_gmsr * v3_cand_mult)}</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">{format_bn(_v3_em_gmsr * v3_buf_mult)} – {format_bn(_v3_em_gmsr * v3_cand_mult)}</td>
+        <td style="padding:10px 12px;color:#8892b0;">Nur Bestandsmitglieder bleiben — keine Neuaufnahmen in dieser Zone</td>
+      </tr>
+      <tr style="background:#2d0d0d;">
+        <td style="padding:10px 12px;color:#ef5350;font-weight:700;">Auto-Exclude</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&lt; {v3_buf_mult}× GMSR</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&lt; {format_bn(_v3_dm_gmsr * v3_buf_mult)}</td>
+        <td style="padding:10px 12px;color:#e8eaf6;">&lt; {format_bn(_v3_em_gmsr * v3_buf_mult)}</td>
+        <td style="padding:10px 12px;color:#8892b0;">Ausschluss — auch bestehende Mitglieder raus</td>
+      </tr>
+    </tbody>
+    </table>
+    """
+    st.markdown(_zone_matrix_html, unsafe_allow_html=True)
+    st.markdown("---")
 
     # Zone distribution
     _zone_colors = {"AUTO_INCLUDE": "#2979ff", "CANDIDATE": "#66bb6a", "BUFFER": "#ffa726", "EXCLUDE": "#ef5350"}
@@ -1236,35 +1299,56 @@ with tab_v3:
     _df_v3_em = em_post_filter(_df_v3_included[_df_v3_included["Classification"] == "EM"])
     _df_v3_included = pd.concat([_df_v3_dm, _df_v3_em], ignore_index=True)
 
-    st.markdown(f"**Inkludierte Stocks** — {'AUTO_INCLUDE + CANDIDATE + BUFFER' if include_buffer else 'AUTO_INCLUDE + CANDIDATE'}")
-    _mc1, _mc2, _mc3, _mc4 = st.columns(4)
-    _mc1.metric("DM Stocks",  f"{len(_df_v3_dm):,}")
-    _mc2.metric("EM Stocks",  f"{len(_df_v3_em):,}")
-    _mc3.metric("DM FF MCap", format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()))
-    _mc4.metric("EM FF MCap", format_bn(_df_v3_em["Free Float MCap Y2025"].sum()))
+    # Apply inclusion factors
+    _df_v3_included = add_adjusted_weight(
+        add_ff_weight(_df_v3_included),
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor
+    )
+    _df_v3_dm = _df_v3_included[_df_v3_included["Classification"] == "DM"]
+    _df_v3_em = _df_v3_included[_df_v3_included["Classification"] == "EM"]
 
-    # Country breakdown
+    _total_v3_adj = _df_v3_included["Adjusted FF MCap"].sum()
+    _em_v3_adj    = _df_v3_em["Adjusted FF MCap"].sum()
+    _em_v3_weight = _em_v3_adj / _total_v3_adj * 100 if _total_v3_adj > 0 else 0
+
+    st.markdown(f"**Inkludierte Stocks** — {'AUTO_INCLUDE + CANDIDATE + BUFFER' if include_buffer else 'AUTO_INCLUDE + CANDIDATE'}")
+    _mc1, _mc2, _mc3, _mc4, _mc5, _mc6 = st.columns(6)
+    _mc1.metric("DM Stocks",       f"{len(_df_v3_dm):,}")
+    _mc2.metric("EM Stocks",       f"{len(_df_v3_em):,}")
+    _mc3.metric("DM FF MCap",      format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()))
+    _mc4.metric("EM FF MCap",      format_bn(_df_v3_em["Free Float MCap Y2025"].sum()))
+    _mc5.metric("EM Weight",       f"{_em_v3_adj / _total_v3_adj * 100:.2f}%" if _total_v3_adj > 0 else "—")
+    _mc6.metric("Adj. EM Weight",  f"{_em_v3_weight:.2f}%")
+
+    # Country breakdown (using Adjusted Weight)
     _col_dm3, _col_em3 = st.columns(2)
-    _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_dm.columns else "Exchange Country Name"
+    _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_included.columns else "Exchange Country Name"
+    _total_adj_v3 = _df_v3_included["Adjusted FF MCap"].sum()
 
     with _col_dm3:
         st.markdown("**DM — Country Breakdown**")
         _dm3_c = _df_v3_dm.groupby(_map_col_v3).agg(
-            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum")
-        ).reset_index().sort_values("FF_MCap", ascending=False)
-        _dm3_c["FF MCap (USD)"] = _dm3_c["FF_MCap"].apply(format_bn)
-        _dm3_c["Weight (%)"] = (_dm3_c["FF_MCap"] / _dm3_c["FF_MCap"].sum() * 100).round(2)
-        st.dataframe(_dm3_c[[_map_col_v3,"Stocks","FF MCap (USD)","Weight (%)"]].rename(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Adj_MCap=("Adjusted FF MCap","sum"),
+        ).reset_index().sort_values("Adj_MCap", ascending=False)
+        _dm3_c["FF MCap (USD)"]     = _dm3_c["FF_MCap"].apply(format_bn)
+        _dm3_c["FF Weight (%)"]     = (_dm3_c["FF_MCap"] / _df_v3_dm["Free Float MCap Y2025"].sum() * 100).round(2)
+        _dm3_c["Adj. Weight (%)"]   = (_dm3_c["Adj_MCap"] / _total_adj_v3 * 100).round(2)
+        st.dataframe(_dm3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Adj. Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
     with _col_em3:
         st.markdown("**EM — Country Breakdown**")
         _em3_c = _df_v3_em.groupby(_map_col_v3).agg(
-            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum")
-        ).reset_index().sort_values("FF_MCap", ascending=False)
-        _em3_c["FF MCap (USD)"] = _em3_c["FF_MCap"].apply(format_bn)
-        _em3_c["Weight (%)"] = (_em3_c["FF_MCap"] / _em3_c["FF_MCap"].sum() * 100).round(2)
-        st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","Weight (%)"]].rename(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Adj_MCap=("Adjusted FF MCap","sum"),
+        ).reset_index().sort_values("Adj_MCap", ascending=False)
+        _em3_c["FF MCap (USD)"]     = _em3_c["FF_MCap"].apply(format_bn)
+        _em3_c["FF Weight (%)"]     = (_em3_c["FF_MCap"] / _df_v3_em["Free Float MCap Y2025"].sum() * 100).round(2)
+        _em3_c["Adj. Weight (%)"]   = (_em3_c["Adj_MCap"] / _total_adj_v3 * 100).round(2)
+        st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Adj. Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
     # Download
