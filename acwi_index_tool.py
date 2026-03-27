@@ -273,14 +273,16 @@ def add_ff_weight(df):
     return df
 
 
-def add_adjusted_weight(df, china_factor=0.20):
-    """Add Adjusted Weight (%) column applying inclusion factor for China A-Shares.
-    Shanghai & Shenzhen stocks get FF MCap * china_factor, all others * 1.0.
+def add_adjusted_weight(df, china_factor=0.20, india_factor=0.50, vietnam_factor=0.50, saudi_factor=0.50):
+    """Add Adjusted Weight (%) column applying inclusion factors per country.
     Fully vectorized — no apply().
     """
     df = df.copy()
-    is_china_a = df["Exchange Name"].isin(["SHANGHAI", "SHENZHEN"])
-    df["Inclusion Factor"] = np.where(is_china_a, china_factor, 1.0)
+    df["Inclusion Factor"] = 1.0
+    df.loc[df["Exchange Name"].isin(["SHANGHAI", "SHENZHEN"]), "Inclusion Factor"] = china_factor
+    df.loc[df["Exchange Name"].isin(["BSE INDIA", "NSE INDIA"]), "Inclusion Factor"] = india_factor
+    df.loc[df["Exchange Name"].isin(["HANOI STOCK EXCHANGE", "VIETNAM"]), "Inclusion Factor"] = vietnam_factor
+    df.loc[df["Exchange Name"] == "SAUDI ARABIA", "Inclusion Factor"] = saudi_factor
     df["Adjusted FF MCap"] = df["Free Float MCap Y2025"] * df["Inclusion Factor"]
     total_adj = df["Adjusted FF MCap"].sum()
     df["Adjusted Weight (%)"] = (df["Adjusted FF MCap"] / total_adj * 100) if total_adj > 0 else 0.0
@@ -515,15 +517,35 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### ⚖️ Weighting")
     with st.expander("Inclusion Factors", expanded=False):
-        st.markdown("""**China A-Shares** <span title="Gilt für Shanghai & Shenzhen. Adjusted FF MCap = FF MCap × Factor. Adjusted Weight = Adjusted FF MCap / Σ Adjusted FF MCap aller Index-Stocks." style="cursor:help;color:#8892b0;font-size:13px;">ⓘ</span>""", unsafe_allow_html=True)
+        _info = "<span title='Adjusted FF MCap = FF MCap × Factor. Adjusted Weight = Adjusted FF MCap / Σ Adjusted FF MCap aller Index-Stocks.' style='cursor:help;color:#8892b0;font-size:13px;'>ⓘ</span>"
+
+        st.markdown(f"**China A-Shares** {_info}", unsafe_allow_html=True)
         _cna, _cnb = st.columns([3, 4])
-        with _cna:
-            use_china_factor = st.checkbox("aktiv", value=True, key="use_china_factor")
-        with _cnb:
-            china_factor_raw = st.text_input("China Factor", value="20", key="china_factor_input",
-                label_visibility="collapsed", disabled=not use_china_factor)
+        with _cna: use_china_factor = st.checkbox("aktiv", value=True, key="use_china_factor")
+        with _cnb: china_factor_raw = st.text_input("China", value="20", key="china_factor_input", label_visibility="collapsed", disabled=not use_china_factor)
         try:    china_inclusion_factor = float(china_factor_raw) / 100 if use_china_factor else 1.0
         except: china_inclusion_factor = 0.20
+
+        st.markdown(f"**Indien** {_info}", unsafe_allow_html=True)
+        _ina, _inb = st.columns([3, 4])
+        with _ina: use_india_factor = st.checkbox("aktiv", value=True, key="use_india_factor")
+        with _inb: india_factor_raw = st.text_input("Indien", value="50", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
+        try:    india_inclusion_factor = float(india_factor_raw) / 100 if use_india_factor else 1.0
+        except: india_inclusion_factor = 0.50
+
+        st.markdown(f"**Vietnam** {_info}", unsafe_allow_html=True)
+        _vna, _vnb = st.columns([3, 4])
+        with _vna: use_vietnam_factor = st.checkbox("aktiv", value=True, key="use_vietnam_factor")
+        with _vnb: vietnam_factor_raw = st.text_input("Vietnam", value="50", key="vietnam_factor_input", label_visibility="collapsed", disabled=not use_vietnam_factor)
+        try:    vietnam_inclusion_factor = float(vietnam_factor_raw) / 100 if use_vietnam_factor else 1.0
+        except: vietnam_inclusion_factor = 0.50
+
+        st.markdown(f"**Saudi-Arabien** {_info}", unsafe_allow_html=True)
+        _saa, _sab = st.columns([3, 4])
+        with _saa: use_saudi_factor = st.checkbox("aktiv", value=True, key="use_saudi_factor")
+        with _sab: saudi_factor_raw = st.text_input("Saudi-Arabien", value="50", key="saudi_factor_input", label_visibility="collapsed", disabled=not use_saudi_factor)
+        try:    saudi_inclusion_factor = float(saudi_factor_raw) / 100 if use_saudi_factor else 1.0
+        except: saudi_inclusion_factor = 0.50
 
     st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
@@ -918,7 +940,7 @@ with tab_v1:
     export_v1["cum_pct"] = export_v1["cum_pct"].round(4)
     _drop = ["cum_ff"]
     _v1_universe = export_v1.drop(columns=_drop, errors="ignore")
-    _v1_world    = add_adjusted_weight(add_ff_weight(_v1_universe[(_v1_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v1_universe["Status"]=="Included")]), china_inclusion_factor)
+    _v1_world    = add_adjusted_weight(add_ff_weight(_v1_universe[(_v1_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v1_universe["Status"]=="Included")]), china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
     st.download_button(
         "⬇️ Download Variant 1 as Excel",
         data=to_excel_multi({"Universe": _v1_universe, "World Index (DM)": _v1_world}),
@@ -1017,7 +1039,7 @@ with tab_v2:
     export_v2 = build_full_export(df_v2, "DM", dm_post_filter, _fp_dm2)
     export_v2["cum_pct"] = export_v2["cum_pct"].round(4)
     _v2_universe = export_v2.drop(columns=["cum_ff"], errors="ignore")
-    _v2_world    = add_adjusted_weight(add_ff_weight(_v2_universe[(_v2_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v2_universe["Status"]=="Included")]), china_inclusion_factor)
+    _v2_world    = add_adjusted_weight(add_ff_weight(_v2_universe[(_v2_universe["Segment"].isin(["Large Cap","Mid Cap"])) & (_v2_universe["Status"]=="Included")]), china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
     st.download_button(
         "⬇️ Download Variant 2 as Excel",
         data=to_excel_multi({"Universe": _v2_universe, "World Index (DM)": _v2_world}),
@@ -1168,7 +1190,7 @@ with tab_acwi:
     total_ff_acwi = df_acwi_dm["Free Float MCap Y2025"].sum() + df_acwi_em["Free Float MCap Y2025"].sum()
 
     # Compute Adjusted EM Weight
-    _acwi_adj = add_adjusted_weight(pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True), china_inclusion_factor)
+    _acwi_adj = add_adjusted_weight(pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True), china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
     _total_adj_acwi = _acwi_adj["Adjusted FF MCap"].sum()
     _em_adj_weight = _acwi_adj[_acwi_adj["Classification"] == "EM"]["Adjusted FF MCap"].sum() / _total_adj_acwi * 100 if _total_adj_acwi > 0 else 0
 
@@ -1390,7 +1412,7 @@ with tab_acwi:
     _total_stocks = len(_acwi_all)
 
     # Apply inclusion factor for Adjusted Weight
-    _acwi_all_adj = add_adjusted_weight(_acwi_all, china_inclusion_factor)
+    _acwi_all_adj = add_adjusted_weight(_acwi_all, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
 
     _country_col = _country_basis if _country_basis in _acwi_all_adj.columns else "Exchange Country Name"
     _country_agg = _acwi_all_adj.groupby([_country_col,"Classification"]).agg(
@@ -1496,11 +1518,11 @@ with tab_acwi:
         (_acwi_universe["Classification"] == "DM") &
         (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap"])) &
         (_acwi_universe["Status"] == "Included")
-    ]), china_inclusion_factor)
+    ]), china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
     _acwi_index = add_adjusted_weight(add_ff_weight(_acwi_universe[
         (_acwi_universe["Segment"].isin(["Large Cap","Mid Cap","EM Included"])) &
         (_acwi_universe["Status"] == "Included")
-    ]), china_inclusion_factor)
+    ]), china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
     st.download_button(
         "⬇️ Download ACWI as Excel",
         data=to_excel_multi({
@@ -1647,7 +1669,7 @@ with tab_acwi_compare:
     st.markdown("**DM vs EM Gewichtung (Adjusted Weights)**")
 
     def _adj_ff(df):
-        return add_adjusted_weight(df, china_inclusion_factor)["Adjusted FF MCap"].sum()
+        return add_adjusted_weight(df, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)["Adjusted FF MCap"].sum()
 
     _em_methods = {
         f"EM Threshold ({em_threshold_pct}%)": em_thr,
