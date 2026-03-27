@@ -994,7 +994,12 @@ with tab_v2:
 with tab_acwi:
     st.subheader("ACWI — All Country World Index (DM + EM)")
 
-    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global / MSCI)", "Variant 2 (Per-Country / Solactive)"], horizontal=True)
+    # Reset EM method to Threshold when switching to Variant 1
+    _prev_variant = st.session_state.get("_prev_acwi_variant", "Variant 1 (Global / MSCI)")
+    acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global / MSCI)", "Variant 2 (Per-Country / Solactive)"], horizontal=True, key="acwi_variant_radio")
+    if _prev_variant == "Variant 2 (Per-Country / Solactive)" and acwi_variant == "Variant 1 (Global / MSCI)":
+        st.session_state["em_method_radio"] = "Threshold (% des DM Grenzstocks)"
+    st.session_state["_prev_acwi_variant"] = acwi_variant
 
     if acwi_variant == "Variant 1 (Global / MSCI)":
         df_dm_seg = _seg_dm_v1
@@ -1015,6 +1020,7 @@ with tab_acwi:
                 "Global 85% (wie DM Variant 1)",
             ],
             horizontal=True,
+            key="em_method_radio",
             help="Threshold: Mindest-MCap relativ zum DM-Grenzstock. Global 85%: alle EM global sortiert, Top-85% FF MCap."
         )
 
