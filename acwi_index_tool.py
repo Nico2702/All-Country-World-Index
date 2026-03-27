@@ -112,6 +112,70 @@ def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
     return pd.concat(results, ignore_index=True)
 
 
+def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.15,
+                      gmsr_pct=0.85, em_gmsr_ratio=0.50,
+                      auto_mult=1.15, cand_mult=0.50, buf_mult=0.33):
+    """Dynamic GMSR/EUMSS methodology.
+    df_all must contain both DM and EM stocks with Classification column.
+    Returns df with EUMSS_FULL, EUMSS_FF, DM_GMSR, EM_GMSR, GMSR_TITEL, Zone columns.
+    """
+    df = df_all.copy()
+
+    # Step 1: Compute EUMSS on all DM stocks (before any filter)
+    df_dm_all = df[df["Classification"] == "DM"].sort_values("Total MCap Y2025", ascending=False)
+    total_ff_dm = df_dm_all["Free Float MCap Y2025"].sum()
+    if total_ff_dm == 0:
+        df["Zone"] = "EXCLUDE"
+        return df, 0, 0, 0, 0
+
+    df_dm_all = df_dm_all.copy()
+    df_dm_all["cum_ff"] = df_dm_all["Free Float MCap Y2025"].cumsum()
+    df_dm_all["cum_pct"] = df_dm_all["cum_ff"] / total_ff_dm * 100
+    eumss_row = df_dm_all[df_dm_all["cum_pct"] >= eumss_pct * 100].iloc[0]
+    eumss_full = eumss_row["Total MCap Y2025"]
+    eumss_ff   = eumss_full * eumss_ff_ratio
+
+    # Step 2: Apply EUMSS filter
+    mask_eumss = (
+        (df["Total MCap Y2025"] >= eumss_full) &
+        (df["Free Float MCap Y2025"] >= eumss_ff) &
+        (df["Free Float Percent"] >= min_ff_pct)
+    )
+    df["EUMSS_Pass"] = mask_eumss
+
+    # Step 3: Compute DM GMSR on EUMSS-filtered DM stocks
+    df_dm_filtered = df[mask_eumss & (df["Classification"] == "DM")].sort_values("Total MCap Y2025", ascending=False).copy()
+    total_ff_dm_f = df_dm_filtered["Free Float MCap Y2025"].sum()
+    if total_ff_dm_f == 0:
+        df["Zone"] = "EXCLUDE"
+        return df, eumss_full, eumss_ff, 0, 0
+
+    df_dm_filtered["cum_ff"] = df_dm_filtered["Free Float MCap Y2025"].cumsum()
+    df_dm_filtered["cum_pct"] = df_dm_filtered["cum_ff"] / total_ff_dm_f * 100
+    gmsr_row = df_dm_filtered[df_dm_filtered["cum_pct"] >= gmsr_pct * 100].iloc[0]
+    dm_gmsr = gmsr_row["Total MCap Y2025"]
+    em_gmsr = dm_gmsr * em_gmsr_ratio
+
+    # Step 4: Assign GMSR per stock and compute zone
+    df["GMSR_TITEL"] = np.where(df["Classification"] == "DM", dm_gmsr, em_gmsr)
+    df["EUMSS_FULL"] = eumss_full
+    df["EUMSS_FF"]   = eumss_ff
+    df["DM_GMSR"]    = dm_gmsr
+    df["EM_GMSR"]    = em_gmsr
+
+    def assign_zone(row):
+        if not row["EUMSS_Pass"]:
+            return "EXCLUDE"
+        ratio = row["Total MCap Y2025"] / row["GMSR_TITEL"] if row["GMSR_TITEL"] > 0 else 0
+        if ratio > auto_mult:   return "AUTO_INCLUDE"
+        if ratio >= cand_mult:  return "CANDIDATE"
+        if ratio >= buf_mult:   return "BUFFER"
+        return "EXCLUDE"
+
+    df["Zone"] = df.apply(assign_zone, axis=1)
+    return df, eumss_full, eumss_ff, dm_gmsr, em_gmsr
+
+
 def get_dm_cutoff_stock(df_dm_seg):
     """Return the last DM stock in the World Index (V1: global sort → simply last row included)."""
     world = df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])]
@@ -431,6 +495,56 @@ with st.sidebar:
 
 
     st.markdown("---")
+    st.markdown("### 📊 Variant 3 — Dynamic (GMSR/EUMSS)")
+    with st.expander("Parameter", expanded=False):
+        st.markdown("**EUMSS**")
+        _v3a, _v3b = st.columns([3, 4])
+        with _v3a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Kalibrierung (%)</div>", unsafe_allow_html=True)
+        with _v3b: _v3_eumss_pct = st.text_input("EUMSS Kalibrierung", value="99", key="v3_eumss_pct", label_visibility="collapsed")
+        _v3c, _v3d = st.columns([3, 4])
+        with _v3c: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>FF Ratio (%)</div>", unsafe_allow_html=True)
+        with _v3d: _v3_eumss_ff = st.text_input("EUMSS FF Ratio", value="50", key="v3_eumss_ff", label_visibility="collapsed")
+        _v3e, _v3f = st.columns([3, 4])
+        with _v3e: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Min. FF% (%)</div>", unsafe_allow_html=True)
+        with _v3f: _v3_min_ff_pct = st.text_input("Min FF Pct", value="15", key="v3_min_ff_pct", label_visibility="collapsed")
+        st.markdown("**GMSR**")
+        _v3g, _v3h = st.columns([3, 4])
+        with _v3g: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Kalibrierung (%)</div>", unsafe_allow_html=True)
+        with _v3h: _v3_gmsr_pct = st.text_input("GMSR Kalibrierung", value="85", key="v3_gmsr_pct", label_visibility="collapsed")
+        _v3i, _v3j = st.columns([3, 4])
+        with _v3i: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM GMSR Ratio (%)</div>", unsafe_allow_html=True)
+        with _v3j: _v3_em_gmsr_ratio = st.text_input("EM GMSR Ratio", value="50", key="v3_em_gmsr_ratio", label_visibility="collapsed")
+        st.markdown("**Zonen-Multiplikatoren**")
+        _v3k, _v3l = st.columns([3, 4])
+        with _v3k: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>AUTO_INCLUDE</div>", unsafe_allow_html=True)
+        with _v3l: _v3_auto = st.text_input("AUTO_INCLUDE", value="1.15", key="v3_auto", label_visibility="collapsed")
+        _v3m, _v3n = st.columns([3, 4])
+        with _v3m: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>CANDIDATE</div>", unsafe_allow_html=True)
+        with _v3n: _v3_cand = st.text_input("CANDIDATE", value="0.50", key="v3_cand", label_visibility="collapsed")
+        _v3o, _v3p = st.columns([3, 4])
+        with _v3o: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>BUFFER</div>", unsafe_allow_html=True)
+        with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
+        include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
+            help="Bei Erstberechnung ohne historischen State: BUFFER-Stocks trotzdem einschließen.")
+
+    try:    v3_eumss_pct      = float(_v3_eumss_pct) / 100
+    except: v3_eumss_pct      = 0.99
+    try:    v3_eumss_ff_ratio = float(_v3_eumss_ff) / 100
+    except: v3_eumss_ff_ratio = 0.50
+    try:    v3_min_ff_pct     = float(_v3_min_ff_pct) / 100
+    except: v3_min_ff_pct     = 0.15
+    try:    v3_gmsr_pct       = float(_v3_gmsr_pct) / 100
+    except: v3_gmsr_pct       = 0.85
+    try:    v3_em_gmsr_ratio  = float(_v3_em_gmsr_ratio) / 100
+    except: v3_em_gmsr_ratio  = 0.50
+    try:    v3_auto_mult      = float(_v3_auto)
+    except: v3_auto_mult      = 1.15
+    try:    v3_cand_mult      = float(_v3_cand)
+    except: v3_cand_mult      = 0.50
+    try:    v3_buf_mult       = float(_v3_buf)
+    except: v3_buf_mult       = 0.33
+
+    st.markdown("---")
     st.markdown("### 🔍 Filter")
     filter_timing = st.radio(
         "Filter Zeitpunkt:",
@@ -690,10 +804,11 @@ if _acwi_variant_g == "Variant 2 (Per-Country / Solactive)":
 else:
     _em_method_g = st.session_state.get("em_method_radio", "Threshold (% des DM Grenzstocks)")
 
-tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
+tab_overview, tab_v1, tab_v2, tab_v3, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
     "🌍 Universe Overview",
     "📐 Variant 1 — Global / MSCI DM Thresholds",
     "🗺️ Variant 2 — Per-Country / Solactive DM Thresholds",
+    "⚡ Variant 3 — Dynamic (GMSR/EUMSS)",
     "🌐 ACWI (DM + EM)",
     "⚖️ Variant Comparison (World)",
     "🔀 ACWI Comparison (V1 vs V2)",
@@ -1040,6 +1155,122 @@ with tab_v2:
         "⬇️ Download Variant 2 as Excel",
         data=to_excel_multi({"Universe": _v2_universe, "World Index (DM)": _v2_world}),
         file_name="NaroIX_World_Variant2.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3: VARIANT 3 — DYNAMIC (GMSR/EUMSS)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_v3:
+    st.subheader("Variant 3 — Dynamic GMSR/EUMSS (MSCI-Style)")
+
+    # Run computation on full DM+EM universe
+    _df_all = pd.concat([df_dm_full, df_em_full], ignore_index=True)
+    _df_v3, _v3_eumss_full, _v3_eumss_ff, _v3_dm_gmsr, _v3_em_gmsr = compute_variant3(
+        _df_all, v3_eumss_pct, v3_eumss_ff_ratio, v3_min_ff_pct,
+        v3_gmsr_pct, v3_em_gmsr_ratio, v3_auto_mult, v3_cand_mult, v3_buf_mult
+    )
+
+    # Key metrics
+    st.markdown(f"""
+    <div class="info-box">
+    <b>EUMSS_FULL:</b> {format_bn(_v3_eumss_full)} &nbsp;|&nbsp;
+    <b>EUMSS_FF:</b> {format_bn(_v3_eumss_ff)} &nbsp;|&nbsp;
+    <b>DM GMSR:</b> {format_bn(_v3_dm_gmsr)} &nbsp;|&nbsp;
+    <b>EM GMSR:</b> {format_bn(_v3_em_gmsr)}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Zone distribution
+    _zone_colors = {"AUTO_INCLUDE": "#2979ff", "CANDIDATE": "#66bb6a", "BUFFER": "#ffa726", "EXCLUDE": "#ef5350"}
+    _zones_order = ["AUTO_INCLUDE", "CANDIDATE", "BUFFER", "EXCLUDE"]
+
+    _zone_rows = []
+    for cls in ["DM", "EM"]:
+        for zone in _zones_order:
+            _s = _df_v3[(_df_v3["Classification"] == cls) & (_df_v3["Zone"] == zone)]
+            _zone_rows.append({
+                "Klassifikation": cls,
+                "Zone": zone,
+                "# Stocks": len(_s),
+                "Total MCap (USD)": format_bn(_s["Total MCap Y2025"].sum()),
+                "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
+            })
+    _zone_df = pd.DataFrame(_zone_rows)
+
+    col_z1, col_z2 = st.columns(2)
+    with col_z1:
+        st.markdown("**DM — Zonen-Übersicht**")
+        st.dataframe(_zone_df[_zone_df["Klassifikation"]=="DM"].drop(columns=["Klassifikation"]),
+                     use_container_width=True, hide_index=True)
+    with col_z2:
+        st.markdown("**EM — Zonen-Übersicht**")
+        st.dataframe(_zone_df[_zone_df["Klassifikation"]=="EM"].drop(columns=["Klassifikation"]),
+                     use_container_width=True, hide_index=True)
+
+    # Zone chart
+    st.markdown("**Zonen-Verteilung**")
+    _fig_zone = go.Figure()
+    for zone in _zones_order:
+        _zd = _zone_df[_zone_df["Zone"] == zone]
+        _fig_zone.add_bar(
+            name=zone, x=_zd["Klassifikation"], y=_zd["# Stocks"],
+            marker_color=_zone_colors[zone],
+            text=_zd["# Stocks"], textposition="auto",
+        )
+    _fig_zone.update_layout(
+        barmode="group", template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+        height=320, margin=dict(t=10,b=40,l=60,r=10), legend=dict(orientation="h", yanchor="bottom", y=1.02)
+    )
+    st.plotly_chart(_fig_zone, use_container_width=True)
+
+    # Included stocks (AUTO_INCLUDE + CANDIDATE + optionally BUFFER)
+    _included_zones = ["AUTO_INCLUDE", "CANDIDATE"]
+    if include_buffer:
+        _included_zones.append("BUFFER")
+    _df_v3_included = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
+    _df_v3_dm = _df_v3_included[_df_v3_included["Classification"] == "DM"]
+    _df_v3_em = _df_v3_included[_df_v3_included["Classification"] == "EM"]
+
+    st.markdown(f"**Inkludierte Stocks** — {'AUTO_INCLUDE + CANDIDATE + BUFFER' if include_buffer else 'AUTO_INCLUDE + CANDIDATE'}")
+    _mc1, _mc2, _mc3, _mc4 = st.columns(4)
+    _mc1.metric("DM Stocks",  f"{len(_df_v3_dm):,}")
+    _mc2.metric("EM Stocks",  f"{len(_df_v3_em):,}")
+    _mc3.metric("DM FF MCap", format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()))
+    _mc4.metric("EM FF MCap", format_bn(_df_v3_em["Free Float MCap Y2025"].sum()))
+
+    # Country breakdown
+    _col_dm3, _col_em3 = st.columns(2)
+    _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_dm.columns else "Exchange Country Name"
+
+    with _col_dm3:
+        st.markdown("**DM — Country Breakdown**")
+        _dm3_c = _df_v3_dm.groupby(_map_col_v3).agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum")
+        ).reset_index().sort_values("FF_MCap", ascending=False)
+        _dm3_c["FF MCap (USD)"] = _dm3_c["FF_MCap"].apply(format_bn)
+        _dm3_c["Weight (%)"] = (_dm3_c["FF_MCap"] / _dm3_c["FF_MCap"].sum() * 100).round(2)
+        st.dataframe(_dm3_c[[_map_col_v3,"Stocks","FF MCap (USD)","Weight (%)"]].rename(
+            columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
+
+    with _col_em3:
+        st.markdown("**EM — Country Breakdown**")
+        _em3_c = _df_v3_em.groupby(_map_col_v3).agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum")
+        ).reset_index().sort_values("FF_MCap", ascending=False)
+        _em3_c["FF MCap (USD)"] = _em3_c["FF_MCap"].apply(format_bn)
+        _em3_c["Weight (%)"] = (_em3_c["FF_MCap"] / _em3_c["FF_MCap"].sum() * 100).round(2)
+        st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","Weight (%)"]].rename(
+            columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
+
+    # Download
+    _v3_universe = _df_v3.copy()
+    _v3_universe = _v3_universe[[c for c in _v3_universe.columns if c not in ["cum_ff","EUMSS_Pass"]]]
+    st.download_button(
+        "⬇️ Download Variant 3 as Excel",
+        data=to_excel_multi({"Universe V3": _v3_universe, "Included": _df_v3_included}),
+        file_name="NaroIX_Variant3_Dynamic.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
