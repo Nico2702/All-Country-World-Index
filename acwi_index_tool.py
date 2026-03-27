@@ -1543,8 +1543,14 @@ with tab_acwi:
                 "Δ": round(_if_df["Δ"].sum(), 4),
             }])
             _if_df = pd.concat([_if_df, _total_row], ignore_index=True)
+            def _style_if_table(df, highlight_vals, col):
+                def row_style(row):
+                    if row[col] in highlight_vals:
+                        return ["background-color: #1a2a4a; font-weight: 600;"] * len(row)
+                    return [""] * len(row)
+                return df.style.apply(row_style, axis=1)
             st.dataframe(
-                style_segment_table(_if_df, ["Total Weight"]),
+                _style_if_table(_if_df, ["Total Weight"], "Land"),
                 use_container_width=True, hide_index=True
             )
         else:
