@@ -57,7 +57,6 @@ def format_bn(val):
     return f"{val:.0f}"
 
 
-@st.cache_data
 def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
     """Global DM threshold approach.
     Sort by Total MCap desc → cumulative sum on FF MCap → segment by ENDING cum_pct.
@@ -81,7 +80,6 @@ def compute_variant1(df_dm, large_pct, mid_pct, small_pct):
     return df
 
 
-@st.cache_data
 def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
     """Per-country threshold approach.
     Sort by Total MCap desc within each country → cumulative sum on FF MCap → segment by ENDING cum_pct.
@@ -157,7 +155,6 @@ def get_dm_cutoff_stock_v2(df_dm, large_pct, mid_pct, small_pct, mode="min"):
     return selected, df_cutoffs
 
 
-@st.cache_data
 def filter_em_by_threshold(df_em, cutoff_total_mcap, pct):
     """Include EM stocks whose Total MCap >= pct% of the DM cutoff stock Total MCap."""
     min_mcap = cutoff_total_mcap * (pct / 100.0)
@@ -168,7 +165,6 @@ def filter_em_by_threshold(df_em, cutoff_total_mcap, pct):
     return df, min_mcap
 
 
-@st.cache_data
 def filter_em_per_country(df_em, pct=85):
     """Apply per-country cumulative FF MCap rule to EM (same as Variant 2 for DM).
     Sort by Total MCap desc within each EM country, cumulate FF MCap,
@@ -621,6 +617,13 @@ def em_post_filter(df):
     if _filter_is_pre: return df  # already applied pre-segment
     return apply_min_filters(df, em_ff_gt0, min_ff_pct, max_closing_price, em_min_adtv_1m, em_min_adtv_3m, em_min_adtv_6m, em_min_adtv_12m, liq_ratio_min)
 
+# ── Pre-compute segments once — reused across all tabs ────────────────────────
+_seg_dm_v1 = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+_seg_dm_v2 = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+_seg_em_g85 = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+_cutoff_v1 = get_dm_cutoff_stock(_seg_dm_v1)
+_cutoff_mcap_v1 = _cutoff_v1["Total MCap Y2025"] if _cutoff_v1 is not None else 0
+
 
 # ─── Header ────────────────────────────────────────────────────────────────────
 st.markdown("# 📊 NaroIX Index Construction Tool")
@@ -725,8 +728,8 @@ with tab_overview:
     st.caption("Zeigt wie viele Stocks je ADTV-Kombination den Index erreichen (alle anderen aktiven Filter bleiben konstant). Verwendet Variant 1 (Global / MSCI) für DM und EM Threshold-Methodik.")
 
     # Pre-compute segments once
-    _sens_dm = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
-    _sens_em_ref = get_dm_cutoff_stock(_sens_dm)
+    _sens_dm = _seg_dm_v1
+    _sens_em_ref = _cutoff_v1
     _sens_cutoff  = _sens_em_ref["Total MCap Y2025"] if _sens_em_ref is not None else 0
     _sens_em_df, _ = filter_em_by_threshold(df_em, _sens_cutoff, em_threshold_pct)
 
@@ -803,7 +806,7 @@ with tab_v1:
     </div>
     """, unsafe_allow_html=True)
 
-    df_v1 = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+    df_v1 = _seg_dm_v1
 
     # Summary table
     summary = segment_summary(df_v1)
@@ -900,7 +903,7 @@ with tab_v2:
     </div>
     """, unsafe_allow_html=True)
 
-    df_v2 = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+    df_v2 = _seg_dm_v2
 
     summary_v2 = segment_summary(df_v2)
     total_dm_ff = df_dm["Free Float MCap Y2025"].sum()
@@ -994,9 +997,9 @@ with tab_acwi:
     acwi_variant = st.radio("DM Methodik für ACWI:", ["Variant 1 (Global / MSCI)", "Variant 2 (Per-Country / Solactive)"], horizontal=True)
 
     if acwi_variant == "Variant 1 (Global / MSCI)":
-        df_dm_seg = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
+        df_dm_seg = _seg_dm_v1
     else:
-        df_dm_seg = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+        df_dm_seg = _seg_dm_v2
 
     # ── EM Method Selection ──────────────────────────────────────────────────
     if acwi_variant == "Variant 2 (Per-Country / Solactive)":
@@ -1016,8 +1019,8 @@ with tab_acwi:
         )
 
     # ── DM Cutoff Stock — always use global V1 cutoff as EM threshold reference ──
-    dm_seg_v1_ref = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
-    cutoff_stock = get_dm_cutoff_stock(dm_seg_v1_ref)
+    dm_seg_v1_ref = _seg_dm_v1
+    cutoff_stock = _cutoff_v1
     cutoff_total_mcap = cutoff_stock["Total MCap Y2025"] if cutoff_stock is not None else 0
 
     df_acwi_dm = dm_post_filter(df_dm_seg[df_dm_seg["Segment"].isin(["Large Cap", "Mid Cap"])]).copy()
@@ -1064,7 +1067,7 @@ with tab_acwi:
 
     elif em_method == "Global 85% (wie DM Variant 1)":
         # ── Global 85% approach (identical logic to DM Variant 1) ───────────
-        df_em_result = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+        df_em_result = _seg_em_g85
         df_acwi_em = em_post_filter(df_em_result[df_em_result["Segment"].isin(["Large Cap", "Mid Cap"])]).copy()
         em_min_mcap = None
 
@@ -1472,8 +1475,8 @@ with tab_acwi:
 with tab_compare:
     st.subheader("⚖️ Variant 1 vs. Variant 2 — Direct Comparison")
 
-    df_v1_c = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
-    df_v2_c = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+    df_v1_c = _seg_dm_v1
+    df_v2_c = _seg_dm_v2
 
     world_v1 = dm_post_filter(df_v1_c[df_v1_c["Segment"].isin(["Large Cap","Mid Cap"])])
     world_v2 = dm_post_filter(df_v2_c[df_v2_c["Segment"].isin(["Large Cap","Mid Cap"])])
@@ -1548,16 +1551,16 @@ with tab_acwi_compare:
     st.subheader("ACWI Comparison — Variant 1 vs Variant 2 (DM)")
 
     # ── Compute DM both variants ─────────────────────────────────────────────
-    acwi_dm_v1 = compute_variant1(df_dm, large_thr, mid_thr, small_thr)
-    acwi_dm_v2 = compute_variant2(df_dm, large_thr, mid_thr, small_thr)
+    acwi_dm_v1 = _seg_dm_v1
+    acwi_dm_v2 = _seg_dm_v2
     dm_world_v1 = dm_post_filter(acwi_dm_v1[acwi_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])])
     dm_world_v2 = dm_post_filter(acwi_dm_v2[acwi_dm_v2["Segment"].isin(["Large Cap","Mid Cap"])])
 
     # ── EM: compute both methods simultaneously (same for V1 & V2) ───────────
-    cutoff_ref = get_dm_cutoff_stock(acwi_dm_v1)
+    cutoff_ref = _cutoff_v1
     cutoff_mcap_ref = cutoff_ref["Total MCap Y2025"] if cutoff_ref is not None else 0
     em_thr_df, em_min_mcap_cmp = filter_em_by_threshold(df_em, cutoff_mcap_ref, em_threshold_pct)
-    em_g85_df = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+    em_g85_df = _seg_em_g85
     em_pc_df  = filter_em_per_country(df_em, pct=mid_thr)
     em_thr = em_post_filter(em_thr_df[em_thr_df["Segment"] == "EM Included"])
     em_g85 = em_post_filter(em_g85_df[em_g85_df["Segment"].isin(["Large Cap","Mid Cap"])])
