@@ -1230,8 +1230,11 @@ with tab_v3:
     if include_buffer:
         _included_zones.append("BUFFER")
     _df_v3_included = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
-    _df_v3_dm = _df_v3_included[_df_v3_included["Classification"] == "DM"]
-    _df_v3_em = _df_v3_included[_df_v3_included["Classification"] == "EM"]
+
+    # Apply post-filter (ADTV + Liquidity Ratio) — same as V1/V2
+    _df_v3_dm = dm_post_filter(_df_v3_included[_df_v3_included["Classification"] == "DM"])
+    _df_v3_em = em_post_filter(_df_v3_included[_df_v3_included["Classification"] == "EM"])
+    _df_v3_included = pd.concat([_df_v3_dm, _df_v3_em], ignore_index=True)
 
     st.markdown(f"**Inkludierte Stocks** — {'AUTO_INCLUDE + CANDIDATE + BUFFER' if include_buffer else 'AUTO_INCLUDE + CANDIDATE'}")
     _mc1, _mc2, _mc3, _mc4 = st.columns(4)
