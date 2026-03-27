@@ -519,30 +519,26 @@ with st.sidebar:
     with st.expander("Inclusion Factors", expanded=False):
         _info = "<span title='Adjusted FF MCap = FF MCap × Factor. Adjusted Weight = Adjusted FF MCap / Σ Adjusted FF MCap aller Index-Stocks.' style='cursor:help;color:#8892b0;font-size:13px;'>ⓘ</span>"
 
-        st.markdown(f"**China A-Shares** {_info}", unsafe_allow_html=True)
         _cna, _cnb = st.columns([3, 4])
-        with _cna: use_china_factor = st.checkbox("aktiv", value=True, key="use_china_factor")
+        with _cna: use_china_factor = st.checkbox(f"China A-Shares {_info}", value=True, key="use_china_factor")
         with _cnb: china_factor_raw = st.text_input("China", value="20", key="china_factor_input", label_visibility="collapsed", disabled=not use_china_factor)
         try:    china_inclusion_factor = float(china_factor_raw) / 100 if use_china_factor else 1.0
         except: china_inclusion_factor = 0.20
 
-        st.markdown(f"**Indien** {_info}", unsafe_allow_html=True)
         _ina, _inb = st.columns([3, 4])
-        with _ina: use_india_factor = st.checkbox("aktiv", value=True, key="use_india_factor")
+        with _ina: use_india_factor = st.checkbox(f"Indien {_info}", value=True, key="use_india_factor")
         with _inb: india_factor_raw = st.text_input("Indien", value="50", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
         try:    india_inclusion_factor = float(india_factor_raw) / 100 if use_india_factor else 1.0
         except: india_inclusion_factor = 0.50
 
-        st.markdown(f"**Vietnam** {_info}", unsafe_allow_html=True)
         _vna, _vnb = st.columns([3, 4])
-        with _vna: use_vietnam_factor = st.checkbox("aktiv", value=True, key="use_vietnam_factor")
+        with _vna: use_vietnam_factor = st.checkbox(f"Vietnam {_info}", value=True, key="use_vietnam_factor")
         with _vnb: vietnam_factor_raw = st.text_input("Vietnam", value="50", key="vietnam_factor_input", label_visibility="collapsed", disabled=not use_vietnam_factor)
         try:    vietnam_inclusion_factor = float(vietnam_factor_raw) / 100 if use_vietnam_factor else 1.0
         except: vietnam_inclusion_factor = 0.50
 
-        st.markdown(f"**Saudi-Arabien** {_info}", unsafe_allow_html=True)
         _saa, _sab = st.columns([3, 4])
-        with _saa: use_saudi_factor = st.checkbox("aktiv", value=True, key="use_saudi_factor")
+        with _saa: use_saudi_factor = st.checkbox(f"Saudi-Arabien {_info}", value=True, key="use_saudi_factor")
         with _sab: saudi_factor_raw = st.text_input("Saudi-Arabien", value="50", key="saudi_factor_input", label_visibility="collapsed", disabled=not use_saudi_factor)
         try:    saudi_inclusion_factor = float(saudi_factor_raw) / 100 if use_saudi_factor else 1.0
         except: saudi_inclusion_factor = 0.50
