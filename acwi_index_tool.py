@@ -471,16 +471,16 @@ with st.sidebar:
         st.markdown("**Developed Markets (DM)**")
         _dma, _dmb = st.columns([3, 4])
         with _dma: dm_use_1m  = st.checkbox("1M",  value=False, key="dm_use_1m")
-        with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="1,500,000", key="dm_1m", label_visibility="collapsed", disabled=not dm_use_1m))
+        with _dmb: dm_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="2,000,000", key="dm_1m_v2", label_visibility="collapsed", disabled=not dm_use_1m))
         _dme, _dmf = st.columns([3, 4])
-        with _dme: dm_use_3m  = st.checkbox("3M",  value=False, key="dm_use_3m")
-        with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="1,500,000", key="dm_3m", label_visibility="collapsed", disabled=not dm_use_3m))
+        with _dme: dm_use_3m  = st.checkbox("3M",  value=True, key="dm_use_3m")
+        with _dmf: dm_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="2,000,000", key="dm_3m_v2", label_visibility="collapsed", disabled=not dm_use_3m))
         _dma2, _dmb2 = st.columns([3, 4])
         with _dma2: dm_use_6m  = st.checkbox("6M",  value=True, key="dm_use_6m")
-        with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="1,500,000", key="dm_6m", label_visibility="collapsed",  disabled=not dm_use_6m))
+        with _dmb2: dm_min_adtv_6m  = parse_adtv(st.text_input("6M", value="2,000,000", key="dm_6m_v2", label_visibility="collapsed",  disabled=not dm_use_6m))
         _dmc, _dmd = st.columns([3, 4])
-        with _dmc: dm_use_12m = st.checkbox("12M", value=True, key="dm_use_12m")
-        with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="1,500,000", key="dm_12m", label_visibility="collapsed", disabled=not dm_use_12m))
+        with _dmc: dm_use_12m = st.checkbox("12M", value=False, key="dm_use_12m")
+        with _dmd: dm_min_adtv_12m = parse_adtv(st.text_input("12M", value="2,000,000", key="dm_12m_v2", label_visibility="collapsed", disabled=not dm_use_12m))
         if not dm_use_1m:  dm_min_adtv_1m  = 0
         if not dm_use_3m:  dm_min_adtv_3m  = 0
         if not dm_use_6m:  dm_min_adtv_6m  = 0
@@ -489,16 +489,16 @@ with st.sidebar:
         st.markdown("**Emerging Markets (EM)**")
         _ema0, _emb0 = st.columns([3, 4])
         with _ema0: em_use_1m  = st.checkbox("1M",  value=False, key="em_use_1m")
-        with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="750,000", key="em_1m", label_visibility="collapsed", disabled=not em_use_1m))
+        with _emb0: em_min_adtv_1m  = parse_adtv(st.text_input("1M",  value="1,000,000", key="em_1m_v2", label_visibility="collapsed", disabled=not em_use_1m))
         _eme, _emf = st.columns([3, 4])
-        with _eme: em_use_3m  = st.checkbox("3M",  value=False, key="em_use_3m")
-        with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="750,000", key="em_3m", label_visibility="collapsed", disabled=not em_use_3m))
+        with _eme: em_use_3m  = st.checkbox("3M",  value=True, key="em_use_3m")
+        with _emf: em_min_adtv_3m  = parse_adtv(st.text_input("3M",  value="1,000,000", key="em_3m_v2", label_visibility="collapsed", disabled=not em_use_3m))
         _ema, _emb = st.columns([3, 4])
         with _ema: em_use_6m  = st.checkbox("6M",  value=True, key="em_use_6m")
-        with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="750,000", key="em_6m", label_visibility="collapsed",  disabled=not em_use_6m))
+        with _emb: em_min_adtv_6m  = parse_adtv(st.text_input("6M", value="1,000,000", key="em_6m_v2", label_visibility="collapsed",  disabled=not em_use_6m))
         _emc, _emd = st.columns([3, 4])
-        with _emc: em_use_12m = st.checkbox("12M", value=True, key="em_use_12m")
-        with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="750,000", key="em_12m", label_visibility="collapsed", disabled=not em_use_12m))
+        with _emc: em_use_12m = st.checkbox("12M", value=False, key="em_use_12m")
+        with _emd: em_min_adtv_12m = parse_adtv(st.text_input("12M", value="1,000,000", key="em_12m_v2", label_visibility="collapsed", disabled=not em_use_12m))
         if not em_use_1m:  em_min_adtv_1m  = 0
         if not em_use_3m:  em_min_adtv_3m  = 0
         if not em_use_6m:  em_min_adtv_6m  = 0
@@ -527,7 +527,7 @@ with st.sidebar:
 
         _ina, _inb = st.columns([4, 2])
         with _ina: use_india_factor = st.checkbox("Indien", help="Adjusted FF MCap = FF MCap × Factor", value=True, key="use_india_factor")
-        with _inb: india_factor_raw = st.text_input("Indien", value="75", key="india_factor_input", label_visibility="collapsed", disabled=not use_india_factor)
+        with _inb: india_factor_raw = st.text_input("Indien", value="75", key="india_factor_input_v2", label_visibility="collapsed", disabled=not use_india_factor)
         try:    india_inclusion_factor = float(india_factor_raw) / 100 if use_india_factor else 1.0
         except: india_inclusion_factor = 0.75
 
@@ -781,10 +781,10 @@ with tab_overview:
 
     # Use sidebar field values directly (ignoring checkbox state)
     _adtv_periods = {
-        "1M":  ("1M ADTV Y2025",  parse_adtv(st.session_state.get("dm_1m",  "1500000")), parse_adtv(st.session_state.get("em_1m",  "750000"))),
-        "3M":  ("3M ADTV Y2025",  parse_adtv(st.session_state.get("dm_3m",  "1500000")), parse_adtv(st.session_state.get("em_3m",  "750000"))),
-        "6M":  ("6M ADTV Y2025",  parse_adtv(st.session_state.get("dm_6m",  "1500000")), parse_adtv(st.session_state.get("em_6m",  "750000"))),
-        "12M": ("12M ADTV Y2025", parse_adtv(st.session_state.get("dm_12m", "1500000")), parse_adtv(st.session_state.get("em_12m", "750000"))),
+        "1M":  ("1M ADTV Y2025",  parse_adtv(st.session_state.get("dm_1m_v2",  "2000000")), parse_adtv(st.session_state.get("em_1m_v2",  "1000000"))),
+        "3M":  ("3M ADTV Y2025",  parse_adtv(st.session_state.get("dm_3m_v2",  "2000000")), parse_adtv(st.session_state.get("em_3m_v2",  "1000000"))),
+        "6M":  ("6M ADTV Y2025",  parse_adtv(st.session_state.get("dm_6m_v2",  "2000000")), parse_adtv(st.session_state.get("em_6m_v2",  "1000000"))),
+        "12M": ("12M ADTV Y2025", parse_adtv(st.session_state.get("dm_12m_v2", "2000000")), parse_adtv(st.session_state.get("em_12m_v2", "1000000"))),
     }
     _combos = [
         ("1M",), ("3M",), ("6M",), ("12M",),
