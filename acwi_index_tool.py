@@ -661,6 +661,17 @@ if active_filters:
 st.markdown("---")
 
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
+# ── Global ACWI Settings (used in Overview sensitivity table and ACWI tab) ──
+_prev_variant_g = st.session_state.get("_prev_acwi_variant", "Variant 1 (Global / MSCI)")
+_acwi_variant_g = st.session_state.get("acwi_variant_radio", "Variant 1 (Global / MSCI)")
+if _prev_variant_g == "Variant 2 (Per-Country / Solactive)" and _acwi_variant_g == "Variant 1 (Global / MSCI)":
+    st.session_state["em_method_radio"] = "Threshold (% des DM Grenzstocks)"
+
+if _acwi_variant_g == "Variant 2 (Per-Country / Solactive)":
+    _em_method_g = "Per-Country 85% (wie DM Variant 2)"
+else:
+    _em_method_g = st.session_state.get("em_method_radio", "Threshold (% des DM Grenzstocks)")
+
 tab_overview, tab_v1, tab_v2, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
     "🌍 Universe Overview",
     "📐 Variant 1 — Global / MSCI DM Thresholds",
@@ -725,13 +736,22 @@ with tab_overview:
     # ── ADTV Sensitivity Table ───────────────────────────────────────────────
     st.markdown("---")
     st.markdown("**ADTV Threshold Sensitivity — World Index & ACWI**")
-    st.caption("Zeigt wie viele Stocks je ADTV-Kombination den Index erreichen (alle anderen aktiven Filter bleiben konstant). Verwendet Variant 1 (Global / MSCI) für DM und EM Threshold-Methodik.")
+    st.caption(f"Verwendet: DM {_acwi_variant_g} + EM {_em_method_g}. Alle anderen aktiven Filter bleiben konstant.")
 
-    # Pre-compute segments once
-    _sens_dm = _seg_dm_v1
-    _sens_em_ref = _cutoff_v1
-    _sens_cutoff  = _sens_em_ref["Total MCap Y2025"] if _sens_em_ref is not None else 0
-    _sens_em_df, _ = filter_em_by_threshold(df_em, _sens_cutoff, em_threshold_pct)
+    # DM segments based on selected variant
+    _sens_dm = _seg_dm_v1 if _acwi_variant_g == "Variant 1 (Global / MSCI)" else _seg_dm_v2
+
+    # EM base universe based on selected method
+    _sens_cutoff = _cutoff_v1["Total MCap Y2025"] if _cutoff_v1 is not None else 0
+    if _em_method_g == "Threshold (% des DM Grenzstocks)":
+        _sens_em_df, _ = filter_em_by_threshold(df_em, _sens_cutoff, em_threshold_pct)
+        _sens_em_base_seg = "EM Included"
+    elif _em_method_g == "Global 85% (wie DM Variant 1)":
+        _sens_em_df = _seg_em_g85
+        _sens_em_base_seg = "large_mid"
+    else:  # Per-Country
+        _sens_em_df = filter_em_per_country(df_em, pct=mid_thr)
+        _sens_em_base_seg = "EM Included"
 
     # Base filters (everything except ADTV)
     def _base_filter_dm(df):
@@ -756,26 +776,44 @@ with tab_overview:
         ("1M","3M","6M","12M"),
     ]
 
-    # Pre-compute EM segments (global 85% for sensitivity)
-    _sens_em_seg = compute_variant1(df_em, large_thr, mid_thr, small_thr)
+    # Pre-compute EM base (before ADTV)
+    if _sens_em_base_seg == "large_mid":
+        _sens_em_base = _base_filter_em(_sens_em_df[_sens_em_df["Segment"].isin(["Large Cap","Mid Cap"])])
+    else:
+        _sens_em_base = _base_filter_em(_sens_em_df[_sens_em_df["Segment"] == "EM Included"])
 
     _sens_rows = []
     for combo in _combos:
         label = " + ".join(combo)
         _dm_f = _base_filter_dm(_sens_dm[_sens_dm["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])])
-        _em_f = _base_filter_em(_sens_em_df[_sens_em_df["Segment"] == "EM Included"])
-        _em_seg_f = _base_filter_em(_sens_em_seg[_sens_em_seg["Segment"].isin(["Large Cap","Mid Cap"])])
+        _em_f = _sens_em_base.copy()
         for period in combo:
             col, dm_thr, em_thr = _adtv_periods[period]
-            if dm_thr > 0: _dm_f     = _dm_f[_dm_f[col]         >= dm_thr]
-            if em_thr > 0: _em_f     = _em_f[_em_f[col]         >= em_thr]
-            if em_thr > 0: _em_seg_f = _em_seg_f[_em_seg_f[col] >= em_thr]
-        _dm_lc  = len(_dm_f[_dm_f["Segment"] == "Large Cap"])
-        _dm_mc  = len(_dm_f[_dm_f["Segment"] == "Mid Cap"])
-        _wld    = _dm_lc + _dm_mc
-        _em_lc  = len(_em_seg_f[_em_seg_f["Segment"] == "Large Cap"])
-        _em_mc  = len(_em_seg_f[_em_seg_f["Segment"] == "Mid Cap"])
-        _acwi   = _wld + len(_em_f)
+            if dm_thr > 0: _dm_f = _dm_f[_dm_f[col] >= dm_thr]
+            if em_thr > 0: _em_f = _em_f[_em_f[col] >= em_thr]
+
+        _dm_lc = len(_dm_f[_dm_f["Segment"] == "Large Cap"])
+        _dm_mc = len(_dm_f[_dm_f["Segment"] == "Mid Cap"])
+        _wld   = _dm_lc + _dm_mc
+
+        # EM segments based on method
+        if _sens_em_base_seg == "large_mid":
+            # Global 85%: segments already assigned
+            _em_lc = len(_em_f[_em_f["Segment"] == "Large Cap"])
+            _em_mc = len(_em_f[_em_f["Segment"] == "Mid Cap"])
+        else:
+            # Threshold or Per-Country: rank within qualified stocks
+            _em_total_ff = _em_f["Free Float MCap Y2025"].sum()
+            if _em_total_ff > 0 and len(_em_f) > 0:
+                _em_r = _em_f.sort_values("Total MCap Y2025", ascending=False).copy()
+                _em_r["cum_pct"] = _em_r["Free Float MCap Y2025"].cumsum() / _em_total_ff * 100
+                _em_r["EM Seg"] = np.where(_em_r["cum_pct"] <= large_thr, "Large Cap", "Mid Cap")
+                _em_lc = len(_em_r[_em_r["EM Seg"] == "Large Cap"])
+                _em_mc = len(_em_r[_em_r["EM Seg"] == "Mid Cap"])
+            else:
+                _em_lc = _em_mc = 0
+
+        _acwi = _wld + len(_em_f)
         _sens_rows.append({
             "ADTV Kombination": label,
             "DM Large Cap": _dm_lc,
