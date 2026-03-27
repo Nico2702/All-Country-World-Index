@@ -1503,34 +1503,50 @@ with tab_acwi:
 
     with _col_if:
         st.markdown("**Inclusion Factor Impact**")
-        # Build full ACWI for weight comparison
+        # Build full ACWI with adjusted weights
         _acwi_full = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
-        _total_ff_raw = _acwi_full["Free Float MCap Y2025"].sum()
         _acwi_full_adj = add_adjusted_weight(_acwi_full, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
         _total_adj = _acwi_full_adj["Adjusted FF MCap"].sum()
 
-        # Countries with inclusion factor != 1
-        _if_map = {
-            "China A-Shares": (["SHANGHAI","SHENZHEN"], china_inclusion_factor),
-            "Indien":         (["BSE INDIA","NSE INDIA"], india_inclusion_factor),
-            "Vietnam":        (["HANOI STOCK EXCHANGE","VIETNAM"], vietnam_inclusion_factor),
-            "Saudi-Arabien":  (["SAUDI ARABIA"], saudi_inclusion_factor),
+        # Map country names to their Mapping Country / Country of Incorp / Exchange Country Name values
+        # based on the active Länder-Basis toggle
+        _if_country_map = {
+            "China A-Shares": "CHINA",
+            "Indien":         "INDIA",
+            "Vietnam":        "VIETNAM",
+            "Saudi-Arabien":  "SAUDI ARABIA",
         }
+        _if_factor_map = {
+            "China A-Shares": china_inclusion_factor,
+            "Indien":         india_inclusion_factor,
+            "Vietnam":        vietnam_inclusion_factor,
+            "Saudi-Arabien":  saudi_inclusion_factor,
+        }
+
+        # Use same country basis as the chart toggle
+        _if_basis = _country_basis if "_country_basis" in dir() else "Mapping Country"
+        _if_basis_col = _if_basis if _if_basis in _acwi_full_adj.columns else "Exchange Country Name"
+
         _if_rows = []
-        for name, (exchanges, factor) in _if_map.items():
-            _mask = _acwi_full["Exchange Name"].isin(exchanges)
-            _ff = _acwi_full.loc[_mask, "Free Float MCap Y2025"].sum()
-            _adj = _ff * factor
-            if _total_ff_raw > 0 and _ff > 0:
-                _w_before = _ff / _total_ff_raw * 100
-                _w_after  = _adj / _total_adj * 100
-                _if_rows.append({
-                    "Land": name,
-                    "Factor": f"{factor*100:.0f}%",
-                    "Weight (vor)": round(_w_before, 4),
-                    "Weight (nach)": round(_w_after, 4),
-                    "Δ": round(_w_after - _w_before, 4),
-                })
+        for name, country_val in _if_country_map.items():
+            factor = _if_factor_map[name]
+            _mask = _acwi_full_adj[_if_basis_col].fillna("").str.upper() == country_val
+            _ff = _acwi_full_adj.loc[_mask, "Free Float MCap Y2025"].sum()
+            _adj_sum = _acwi_full_adj.loc[_mask, "Adjusted FF MCap"].sum()
+            _total_ff_raw = _acwi_full["Free Float MCap Y2025"].sum()
+            # Weight vor: raw FF MCap / total raw FF MCap (without any inclusion factors)
+            _acwi_no_if = _acwi_full.copy()
+            _acwi_no_if["_raw_weight"] = _acwi_no_if["Free Float MCap Y2025"] / _total_ff_raw * 100
+            _w_before = _acwi_no_if.loc[_mask, "_raw_weight"].sum()
+            # Weight nach: adjusted FF MCap / total adjusted FF MCap
+            _w_after = _adj_sum / _total_adj * 100 if _total_adj > 0 else 0
+            _if_rows.append({
+                "Land": name,
+                "Factor": f"{factor*100:.0f}%",
+                "Weight (vor)": round(_w_before, 4),
+                "Weight (nach)": round(_w_after, 4),
+                "Δ": round(_w_after - _w_before, 4),
+            })
 
         if _if_rows:
             _if_df = pd.DataFrame(_if_rows)
