@@ -655,6 +655,13 @@ with st.sidebar:
         with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
         include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
             help="Bei Erstberechnung ohne historischen State: BUFFER-Stocks trotzdem einschließen.")
+        st.markdown("**ADTV (Schritt 4) — immer aktiv**")
+        _v3u, _v3v = st.columns([3, 4])
+        with _v3u: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM 3M & 6M (USD)</div>", unsafe_allow_html=True)
+        with _v3v: _v3_adtv_dm = st.text_input("DM ADTV", value="2000000", key="v3_adtv_dm", label_visibility="collapsed")
+        _v3w, _v3x = st.columns([3, 4])
+        with _v3w: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM 3M & 6M (USD)</div>", unsafe_allow_html=True)
+        with _v3x: _v3_adtv_em = st.text_input("EM ADTV", value="1000000", key="v3_adtv_em", label_visibility="collapsed")
         st.markdown("**ATVR (Schritt 4)**")
         _v3q, _v3r = st.columns([3, 4])
         with _v3q: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM Min. (%)</div>", unsafe_allow_html=True)
@@ -686,6 +693,10 @@ with st.sidebar:
     except: v3_atvr_dm_min    = 0.20
     try:    v3_atvr_em_min    = float(_v3_atvr_em) / 100
     except: v3_atvr_em_min    = 0.15
+    try:    v3_adtv_dm        = float(_v3_adtv_dm)
+    except: v3_adtv_dm        = 2_000_000
+    try:    v3_adtv_em        = float(_v3_adtv_em)
+    except: v3_adtv_em        = 1_000_000
 
     st.markdown("---")
     st.markdown("### 🔍 Filter")
@@ -1319,8 +1330,8 @@ with tab_v3:
         gmsr_pct=v3_gmsr_pct, em_gmsr_ratio=v3_em_gmsr_ratio,
         auto_mult=v3_auto_mult, cand_mult=v3_cand_mult, buf_mult=v3_buf_mult,
         atvr_dm_min=v3_atvr_dm_min, atvr_em_min=v3_atvr_em_min,
-        adtv_dm_3m=dm_min_adtv_3m, adtv_dm_6m=dm_min_adtv_6m,
-        adtv_em_3m=em_min_adtv_3m, adtv_em_6m=em_min_adtv_6m,
+        adtv_dm_3m=v3_adtv_dm, adtv_dm_6m=v3_adtv_dm,
+        adtv_em_3m=v3_adtv_em, adtv_em_6m=v3_adtv_em,
         china_if=china_inclusion_factor, india_if=india_inclusion_factor,
         vietnam_if=vietnam_inclusion_factor, saudi_if=saudi_inclusion_factor,
     )
