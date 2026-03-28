@@ -1480,6 +1480,45 @@ with tab_v3:
     # ── Pipeline Diagnostics (shown after all steps computed) ───────────────────
     with st.expander("🔍 Pipeline Diagnostik — Stocks je Schritt", expanded=True):
         _diag_rows = []
+        # Step 1: Exclusions — break down by category
+        import re as _re
+        _df_orig = df_raw_original[df_raw_original["Free Float MCap Y2025"].fillna(0) > 0].copy()
+        _n_orig_total = len(_df_orig)
+
+        # FF MCap <= 0 (fixed universe filter)
+        _n_ff_zero = len(df_raw_original) - len(_df_orig)
+        _diag_rows.append({"Schritt": "1a — FF MCap ≤ 0 / fehlend", "DM": "—", "EM": "—", "Total": f"-{_n_ff_zero:,}"})
+
+        # HK CNY
+        _n_hk = (_df_orig["Exchange Ticker"].str.contains("HKG", na=False) & (_df_orig["Trading Currency"] == "CNY")).sum() if exclude_hk_cny else 0
+        _diag_rows.append({"Schritt": "1b — HK (CNY)", "DM": "—", "EM": "—", "Total": f"-{_n_hk:,}"})
+
+        # Country of Risk = @
+        _n_cor = (_df_orig["Country of Risk"].fillna("") == "@").sum() if exclude_country_risk_na else 0
+        _diag_rows.append({"Schritt": "1c — Country of Risk = @", "DM": "—", "EM": "—", "Total": f"-{_n_cor:,}"})
+
+        # NAICS = Investment Funds
+        _n_naics = _df_orig["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False).sum() if exclude_naics_funds else 0
+        _diag_rows.append({"Schritt": "1d — NAICS Investment Funds", "DM": "—", "EM": "—", "Total": f"-{_n_naics:,}"})
+
+        # Exchange = Euro MTF / @
+        _n_euro = _df_orig["Exchange Name"].fillna("").isin(["Euro MTF", "@"]).sum() if exclude_euro_mtf else 0
+        _diag_rows.append({"Schritt": "1e — Exchange Euro MTF / @", "DM": "—", "EM": "—", "Total": f"-{_n_euro:,}"})
+
+        # Name ETF / SICAV / %
+        _etf_p = _re.compile(r'ETF|SICAV|%', _re.IGNORECASE)
+        _n_etf = _df_orig["Name"].fillna("").str.contains(_etf_p).sum() if exclude_etf_sicav else 0
+        _diag_rows.append({"Schritt": "1f — Name: ETF / SICAV / %", "DM": "—", "EM": "—", "Total": f"-{_n_etf:,}"})
+
+        # Thailand Sec Type
+        _th_excl = _df_orig["Exchange Name"].fillna("").str.upper() == "THAILAND"
+        _th_type = "NVDR" if thailand_sec_type == "SHARE" else "SHARE"
+        _n_thai = (_th_excl & (_df_orig["Sec Type"].fillna("") == _th_type)).sum()
+        _diag_rows.append({"Schritt": "1g — Thailand Sec Type", "DM": "—", "EM": "—", "Total": f"-{_n_thai:,}"})
+
+        _n_after_excl = len(df_dm_full) + len(df_em_full)
+        _diag_rows.append({"Schritt": "2 — DM/EM Klassifikation", "DM": len(df_dm_full), "EM": len(df_em_full), "Total": len(df_dm_full)+len(df_em_full)})
+
         _n_eumss_dm = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="DM")).sum())
         _n_eumss_em = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="EM")).sum())
         _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_dm+_n_eumss_em})
