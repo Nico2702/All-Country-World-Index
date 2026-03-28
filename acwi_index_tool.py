@@ -114,66 +114,188 @@ def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
 
 def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.15,
                       gmsr_pct=0.85, em_gmsr_ratio=0.50,
-                      auto_mult=1.15, cand_mult=0.50, buf_mult=0.33):
-    """Dynamic GMSR/EUMSS methodology.
-    df_all must contain both DM and EM stocks with Classification column.
-    Returns df with EUMSS_FULL, EUMSS_FF, DM_GMSR, EM_GMSR, GMSR_TITEL, Zone columns.
+                      auto_mult=1.15, cand_mult=0.50, buf_mult=0.33,
+                      atvr_dm_min=0.20, atvr_em_min=0.15,
+                      china_if=0.20, india_if=0.75, vietnam_if=0.50, saudi_if=0.50):
+    """Full NaroIX V3 methodology — Steps 3-6.
+    Implements EUMSS, ATVR, Inclusion Factors, GMSR and Zone assignment.
+    Steps 7 (85% coverage) and 8 (secondary) handled separately in the tab.
+    Returns (df_annotated, eumss_full, eumss_ff, dm_gmsr, em_gmsr)
     """
     df = df_all.copy()
 
-    # Step 1: Compute EUMSS on all DM stocks (before any filter)
-    df_dm_all = df[df["Classification"] == "DM"].sort_values("Total MCap Y2025", ascending=False)
+    # ── Step 3: Compute EUMSS on ALL DM stocks ───────────────────────────────
+    df_dm_all = df[df["Classification"] == "DM"].sort_values("Total MCap Y2025", ascending=False).copy()
     total_ff_dm = df_dm_all["Free Float MCap Y2025"].sum()
     if total_ff_dm == 0:
         df["Zone"] = "EXCLUDE"
         return df, 0, 0, 0, 0
 
-    df_dm_all = df_dm_all.copy()
-    df_dm_all["cum_ff"] = df_dm_all["Free Float MCap Y2025"].cumsum()
-    df_dm_all["cum_pct"] = df_dm_all["cum_ff"] / total_ff_dm * 100
-    eumss_row = df_dm_all[df_dm_all["cum_pct"] >= eumss_pct * 100].iloc[0]
+    df_dm_all["_cum_ff"] = df_dm_all["Free Float MCap Y2025"].cumsum()
+    df_dm_all["_cum_pct"] = df_dm_all["_cum_ff"] / total_ff_dm * 100
+    eumss_row = df_dm_all[df_dm_all["_cum_pct"] >= eumss_pct * 100].iloc[0]
     eumss_full = eumss_row["Total MCap Y2025"]
     eumss_ff   = eumss_full * eumss_ff_ratio
 
-    # Step 2: Apply EUMSS filter
+    # EUMSS filter mask
     mask_eumss = (
         (df["Total MCap Y2025"] >= eumss_full) &
         (df["Free Float MCap Y2025"] >= eumss_ff) &
         (df["Free Float Percent"] >= min_ff_pct)
     )
     df["EUMSS_Pass"] = mask_eumss
+    df["EUMSS_FULL"] = eumss_full
+    df["EUMSS_FF"]   = eumss_ff
 
-    # Step 3: Compute DM GMSR on EUMSS-filtered DM stocks
-    df_dm_filtered = df[mask_eumss & (df["Classification"] == "DM")].sort_values("Total MCap Y2025", ascending=False).copy()
-    total_ff_dm_f = df_dm_filtered["Free Float MCap Y2025"].sum()
-    if total_ff_dm_f == 0:
+    # ── Step 4: ADTV + ATVR filter ───────────────────────────────────────────
+    # ADTV best fallback: 12M → 6M → 3M → 1M
+    df["_adtv_best"] = df["12M ADTV Y2025"].where(df["12M ADTV Y2025"] > 0,
+                       df["6M ADTV Y2025"].where(df["6M ADTV Y2025"] > 0,
+                       df["3M ADTV Y2025"].where(df["3M ADTV Y2025"] > 0,
+                       df["1M ADTV Y2025"])))
+    df["ATVR"] = np.where(df["Total MCap Y2025"] > 0,
+                          df["_adtv_best"] * 252 / df["Total MCap Y2025"], 0)
+
+    mask_atvr_dm = (df["Classification"] == "DM") & (df["ATVR"] >= atvr_dm_min)
+    mask_atvr_em = (df["Classification"] == "EM") & (df["ATVR"] >= atvr_em_min)
+    df["ATVR_Pass"] = mask_atvr_dm | mask_atvr_em
+
+    # ── Step 5: Inclusion Factor + Adj_FF_MCap ───────────────────────────────
+    # Based on Exchange Country Name (not Exchange Name)
+    ecn = df["Exchange Country Name"].fillna("")
+    df["Inclusion_Factor_V3"] = np.where(ecn.str.upper() == "CHINA",        china_if,
+                                np.where(ecn.str.upper() == "INDIA",        india_if,
+                                np.where(ecn.str.upper() == "VIETNAM",      vietnam_if,
+                                np.where(ecn.str.upper() == "SAUDI ARABIA", saudi_if, 1.0))))
+    df["Adj_FF_MCap"] = df["Free Float MCap Y2025"] * df["Inclusion_Factor_V3"]
+
+    # ── Step 6: Compute GMSR on EUMSS+ATVR filtered DM stocks using Adj_FF_MCap
+    mask_dm_pass = mask_eumss & df["ATVR_Pass"] & (df["Classification"] == "DM")
+    df_dm_filtered = df[mask_dm_pass].sort_values("Total MCap Y2025", ascending=False).copy()
+    total_adj_dm_f = df_dm_filtered["Adj_FF_MCap"].sum()
+    if total_adj_dm_f == 0:
         df["Zone"] = "EXCLUDE"
         return df, eumss_full, eumss_ff, 0, 0
 
-    df_dm_filtered["cum_ff"] = df_dm_filtered["Free Float MCap Y2025"].cumsum()
-    df_dm_filtered["cum_pct"] = df_dm_filtered["cum_ff"] / total_ff_dm_f * 100
-    gmsr_row = df_dm_filtered[df_dm_filtered["cum_pct"] >= gmsr_pct * 100].iloc[0]
+    df_dm_filtered["_cum_adj"] = df_dm_filtered["Adj_FF_MCap"].cumsum()
+    df_dm_filtered["_cum_adj_pct"] = df_dm_filtered["_cum_adj"] / total_adj_dm_f * 100
+    gmsr_row = df_dm_filtered[df_dm_filtered["_cum_adj_pct"] >= gmsr_pct * 100].iloc[0]
     dm_gmsr = gmsr_row["Total MCap Y2025"]
     em_gmsr = dm_gmsr * em_gmsr_ratio
 
-    # Step 4: Assign GMSR per stock and compute zone
-    df["GMSR_TITEL"] = np.where(df["Classification"] == "DM", dm_gmsr, em_gmsr)
-    df["EUMSS_FULL"] = eumss_full
-    df["EUMSS_FF"]   = eumss_ff
     df["DM_GMSR"]    = dm_gmsr
     df["EM_GMSR"]    = em_gmsr
+    df["GMSR_TITEL"] = np.where(df["Classification"] == "DM", dm_gmsr, em_gmsr)
 
-    def assign_zone(row):
-        if not row["EUMSS_Pass"]:
-            return "EXCLUDE"
-        ratio = row["Total MCap Y2025"] / row["GMSR_TITEL"] if row["GMSR_TITEL"] > 0 else 0
-        if ratio > auto_mult:   return "AUTO_INCLUDE"
-        if ratio >= cand_mult:  return "CANDIDATE"
-        if ratio >= buf_mult:   return "BUFFER"
-        return "EXCLUDE"
+    # Zone assignment (vectorized)
+    ratio = np.where(df["GMSR_TITEL"] > 0, df["Total MCap Y2025"] / df["GMSR_TITEL"], 0)
+    zone = np.where(~mask_eumss | ~df["ATVR_Pass"],     "EXCLUDE",
+           np.where(ratio > auto_mult,                  "AUTO_INCLUDE",
+           np.where(ratio >= cand_mult,                 "CANDIDATE",
+           np.where(ratio >= buf_mult,                  "BUFFER",
+                                                        "EXCLUDE"))))
+    df["Zone"] = zone
 
-    df["Zone"] = df.apply(assign_zone, axis=1)
     return df, eumss_full, eumss_ff, dm_gmsr, em_gmsr
+
+
+def apply_step7_coverage(df_candidates, coverage_pct=0.85, country_col="Mapping Country"):
+    """Step 7: 85% coverage per country based on Adj_FF_MCap.
+    Returns subset of df that passes coverage threshold per country.
+    """
+    results = []
+    country_col = country_col if country_col in df_candidates.columns else "Exchange Country Name"
+    for country, grp in df_candidates.groupby(country_col):
+        grp = grp.sort_values("Adj_FF_MCap", ascending=False).copy()
+        total_adj = grp["Adj_FF_MCap"].sum()
+        if total_adj == 0:
+            continue
+        grp["_cum_adj"] = grp["Adj_FF_MCap"].cumsum()
+        grp["_cum_adj_pct"] = grp["_cum_adj"] / total_adj * 100
+        target = coverage_pct * 100
+        # Find cutoff index — include the stock that crosses the threshold
+        cutoff_idx = grp[grp["_cum_adj_pct"] >= target].index
+        if len(cutoff_idx) == 0:
+            results.append(grp)
+        else:
+            include_up_to = cutoff_idx[0]
+            results.append(grp.loc[:include_up_to])
+    if results:
+        return pd.concat(results, ignore_index=True)
+    return pd.DataFrame(columns=df_candidates.columns)
+
+
+def apply_step8_secondary(df_step7, df_raw_orig, eumss_full, eumss_ff, min_ff_pct,
+                           atvr_dm_min, atvr_em_min,
+                           china_if=0.20, india_if=0.75, vietnam_if=0.50, saudi_if=0.50,
+                           adtv_dm_3m=2e6, adtv_dm_6m=2e6, adtv_em_3m=1e6, adtv_em_6m=1e6):
+    """Step 8: Add secondary share classes via Entity ID matching."""
+    if "Entity ID" not in df_step7.columns or "Entity ID" not in df_raw_orig.columns:
+        return df_step7
+
+    # Entity IDs already in index
+    included_entity_ids = set(df_step7["Entity ID"].dropna().unique())
+    included_symbols = set(df_step7["Symbol"].dropna().unique())
+
+    # Filter raw data for secondary listings
+    df_sec = df_raw_orig[
+        (df_raw_orig["Listing"].fillna("") == "Secondary") &
+        (df_raw_orig["Entity ID"].isin(included_entity_ids)) &
+        (~df_raw_orig["Symbol"].isin(included_symbols))
+    ].copy()
+
+    if len(df_sec) == 0:
+        return df_step7
+
+    # Apply same exclusions as Step 1
+    import re
+    _etf_pat = re.compile(r'ETF|SICAV|%', re.IGNORECASE)
+    df_sec = df_sec[
+        (df_sec["Free Float MCap Y2025"].fillna(0) > 0) &
+        (df_sec["Total MCap Y2025"].fillna(0) >= eumss_full) &
+        (df_sec["Free Float MCap Y2025"].fillna(0) >= eumss_ff) &
+        (df_sec["Free Float Percent"].fillna(0) >= min_ff_pct) &
+        (~df_sec["Name"].fillna("").str.contains(_etf_pat))
+    ].copy()
+
+    if len(df_sec) == 0:
+        return df_step7
+
+    # Merge classification from step7 via Entity ID
+    cls_map = df_step7[["Entity ID","Classification"]].drop_duplicates().set_index("Entity ID")["Classification"].to_dict()
+    df_sec["Classification"] = df_sec["Entity ID"].map(cls_map)
+    df_sec = df_sec[df_sec["Classification"].notna()].copy()
+
+    # ADTV filter
+    df_sec_dm = df_sec[df_sec["Classification"] == "DM"]
+    df_sec_em = df_sec[df_sec["Classification"] == "EM"]
+    df_sec_dm = df_sec_dm[(df_sec_dm["3M ADTV Y2025"] >= adtv_dm_3m) & (df_sec_dm["6M ADTV Y2025"] >= adtv_dm_6m)]
+    df_sec_em = df_sec_em[(df_sec_em["3M ADTV Y2025"] >= adtv_em_3m) & (df_sec_em["6M ADTV Y2025"] >= adtv_em_6m)]
+    df_sec = pd.concat([df_sec_dm, df_sec_em], ignore_index=True)
+
+    # ATVR filter
+    df_sec["_adtv_best"] = df_sec["12M ADTV Y2025"].where(df_sec["12M ADTV Y2025"] > 0,
+                           df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"] > 0,
+                           df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"] > 0,
+                           df_sec["1M ADTV Y2025"])))
+    df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"] > 0,
+                               df_sec["_adtv_best"] * 252 / df_sec["Total MCap Y2025"], 0)
+    df_sec = df_sec[
+        ((df_sec["Classification"] == "DM") & (df_sec["ATVR"] >= atvr_dm_min)) |
+        ((df_sec["Classification"] == "EM") & (df_sec["ATVR"] >= atvr_em_min))
+    ].copy()
+
+    # Apply Inclusion Factor
+    ecn = df_sec["Exchange Country Name"].fillna("")
+    df_sec["Inclusion_Factor_V3"] = np.where(ecn.str.upper() == "CHINA",        china_if,
+                                    np.where(ecn.str.upper() == "INDIA",        india_if,
+                                    np.where(ecn.str.upper() == "VIETNAM",      vietnam_if,
+                                    np.where(ecn.str.upper() == "SAUDI ARABIA", saudi_if, 1.0))))
+    df_sec["Adj_FF_MCap"] = df_sec["Free Float MCap Y2025"] * df_sec["Inclusion_Factor_V3"]
+    df_sec["Zone"] = "SECONDARY"
+    df_sec["Listing_Type"] = "Secondary"
+
+    return pd.concat([df_step7, df_sec], ignore_index=True)
 
 
 def get_dm_cutoff_stock(df_dm_seg):
@@ -526,6 +648,16 @@ with st.sidebar:
         with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
         include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
             help="Bei Erstberechnung ohne historischen State: BUFFER-Stocks trotzdem einschließen.")
+        st.markdown("**ATVR (Schritt 4)**")
+        _v3q, _v3r = st.columns([3, 4])
+        with _v3q: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM Min. (%)</div>", unsafe_allow_html=True)
+        with _v3r: _v3_atvr_dm = st.text_input("DM ATVR", value="20", key="v3_atvr_dm", label_visibility="collapsed")
+        _v3s, _v3t = st.columns([3, 4])
+        with _v3s: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min. (%)</div>", unsafe_allow_html=True)
+        with _v3t: _v3_atvr_em = st.text_input("EM ATVR", value="15", key="v3_atvr_em", label_visibility="collapsed")
+        st.markdown("**Schritt 8**")
+        include_secondary = st.checkbox("Secondary Share Classes einschließen", value=True, key="v3_secondary",
+            help="Schritt 8: Secondary Listings mit gleicher Entity ID ergänzen.")
 
     try:    v3_eumss_pct      = float(_v3_eumss_pct) / 100
     except: v3_eumss_pct      = 0.99
@@ -543,6 +675,10 @@ with st.sidebar:
     except: v3_cand_mult      = 0.50
     try:    v3_buf_mult       = float(_v3_buf)
     except: v3_buf_mult       = 0.33
+    try:    v3_atvr_dm_min    = float(_v3_atvr_dm) / 100
+    except: v3_atvr_dm_min    = 0.20
+    try:    v3_atvr_em_min    = float(_v3_atvr_em) / 100
+    except: v3_atvr_em_min    = 0.15
 
     st.markdown("---")
     st.markdown("### 🔍 Filter")
@@ -667,6 +803,9 @@ if uploaded:
 else:
     st.info("👆 Bitte eine Excel-Datei hochladen um zu starten.")
     st.stop()
+
+# Save original raw data for Step 8 (Secondary Share Classes)
+df_raw_original = df_raw.copy()
 
 # ── Apply Country Classification from repo file ──────────────────────────────
 country_cls = load_classification()
@@ -1165,11 +1304,16 @@ with tab_v2:
 with tab_v3:
     st.subheader("Variant 3 — Dynamic GMSR/EUMSS (MSCI-Style)")
 
-    # Run computation on full DM+EM universe
+    # ── Run full V3 pipeline (Steps 3-6) ────────────────────────────────────────
     _df_all = pd.concat([df_dm_full, df_em_full], ignore_index=True)
     _df_v3, _v3_eumss_full, _v3_eumss_ff, _v3_dm_gmsr, _v3_em_gmsr = compute_variant3(
-        _df_all, v3_eumss_pct, v3_eumss_ff_ratio, v3_min_ff_pct,
-        v3_gmsr_pct, v3_em_gmsr_ratio, v3_auto_mult, v3_cand_mult, v3_buf_mult
+        _df_all,
+        eumss_pct=v3_eumss_pct, eumss_ff_ratio=v3_eumss_ff_ratio, min_ff_pct=v3_min_ff_pct,
+        gmsr_pct=v3_gmsr_pct, em_gmsr_ratio=v3_em_gmsr_ratio,
+        auto_mult=v3_auto_mult, cand_mult=v3_cand_mult, buf_mult=v3_buf_mult,
+        atvr_dm_min=v3_atvr_dm_min, atvr_em_min=v3_atvr_em_min,
+        china_if=china_inclusion_factor, india_if=india_inclusion_factor,
+        vietnam_if=vietnam_inclusion_factor, saudi_if=saudi_inclusion_factor,
     )
 
     # Key metrics — EUMSS cards
@@ -1288,54 +1432,85 @@ with tab_v3:
     )
     st.plotly_chart(_fig_zone, use_container_width=True)
 
-    # Included stocks (AUTO_INCLUDE + CANDIDATE + optionally BUFFER)
+    # ── Step 7: 85% Coverage per country ────────────────────────────────────────
     _included_zones = ["AUTO_INCLUDE", "CANDIDATE"]
     if include_buffer:
         _included_zones.append("BUFFER")
-    _df_v3_included = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
+    _df_v3_candidates = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
+    _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_candidates.columns else "Exchange Country Name"
+    _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3)
 
-    # Apply post-filter (ADTV + Liquidity Ratio) — same as V1/V2
-    _df_v3_dm = dm_post_filter(_df_v3_included[_df_v3_included["Classification"] == "DM"])
-    _df_v3_em = em_post_filter(_df_v3_included[_df_v3_included["Classification"] == "EM"])
-    _df_v3_included = pd.concat([_df_v3_dm, _df_v3_em], ignore_index=True)
+    # ── Step 8: Secondary Share Classes ──────────────────────────────────────
+    if include_secondary and len(_df_v3_step7) > 0:
+        _df_v3_step8 = apply_step8_secondary(
+            _df_v3_step7, df_raw_original,
+            _v3_eumss_full, _v3_eumss_ff, v3_min_ff_pct,
+            v3_atvr_dm_min, v3_atvr_em_min,
+            china_if=china_inclusion_factor, india_if=india_inclusion_factor,
+            vietnam_if=vietnam_inclusion_factor, saudi_if=saudi_inclusion_factor,
+            adtv_dm_3m=dm_min_adtv_3m, adtv_dm_6m=dm_min_adtv_6m,
+            adtv_em_3m=em_min_adtv_3m, adtv_em_6m=em_min_adtv_6m,
+        )
+        _n_secondary = len(_df_v3_step8) - len(_df_v3_step7)
+    else:
+        _df_v3_step8 = _df_v3_step7.copy()
+        _n_secondary = 0
 
-    # Apply inclusion factors
-    _df_v3_included = add_adjusted_weight(
-        add_ff_weight(_df_v3_included),
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor
-    )
+    _df_v3_included = _df_v3_step8.copy()
+
+    # Ensure Adj_FF_MCap column exists (Step 8 stocks already have it, others may not)
+    if "Adj_FF_MCap" not in _df_v3_included.columns:
+        ecn = _df_v3_included["Exchange Country Name"].fillna("")
+        _df_v3_included["Inclusion_Factor_V3"] = np.where(ecn.str.upper() == "CHINA", china_inclusion_factor,
+                                                  np.where(ecn.str.upper() == "INDIA", india_inclusion_factor,
+                                                  np.where(ecn.str.upper() == "VIETNAM", vietnam_inclusion_factor,
+                                                  np.where(ecn.str.upper() == "SAUDI ARABIA", saudi_inclusion_factor, 1.0))))
+        _df_v3_included["Adj_FF_MCap"] = _df_v3_included["Free Float MCap Y2025"] * _df_v3_included["Inclusion_Factor_V3"]
+
+    # ── Step 9: Index Weighting ───────────────────────────────────────────────
+    _total_adj_v3_idx = _df_v3_included["Adj_FF_MCap"].sum()
+    _df_v3_included["Index_Weight"] = (_df_v3_included["Adj_FF_MCap"] / _total_adj_v3_idx * 100) if _total_adj_v3_idx > 0 else 0
+    _df_v3_included["FF MCap Weight (%)"] = (_df_v3_included["Free Float MCap Y2025"] / _df_v3_included["Free Float MCap Y2025"].sum() * 100) if _df_v3_included["Free Float MCap Y2025"].sum() > 0 else 0
+    _df_v3_included = _df_v3_included.sort_values("Index_Weight", ascending=False).copy()
+    _df_v3_included["Rank"] = range(1, len(_df_v3_included) + 1)
+
     _df_v3_dm = _df_v3_included[_df_v3_included["Classification"] == "DM"]
     _df_v3_em = _df_v3_included[_df_v3_included["Classification"] == "EM"]
 
-    _total_v3_adj = _df_v3_included["Adjusted FF MCap"].sum()
-    _em_v3_adj    = _df_v3_em["Adjusted FF MCap"].sum()
-    _em_v3_weight = _em_v3_adj / _total_v3_adj * 100 if _total_v3_adj > 0 else 0
+    _total_adj_v3 = _df_v3_included["Adj_FF_MCap"].sum()
+    _em_v3_adj    = _df_v3_em["Adj_FF_MCap"].sum()
+    _em_v3_weight = _em_v3_adj / _total_adj_v3 * 100 if _total_adj_v3 > 0 else 0
 
-    st.markdown(f"**Inkludierte Stocks** — {'AUTO_INCLUDE + CANDIDATE + BUFFER' if include_buffer else 'AUTO_INCLUDE + CANDIDATE'}")
+    # Validation
+    _sum_weights = _df_v3_included["Index_Weight"].sum()
+    _max_weight  = _df_v3_included["Index_Weight"].max() if len(_df_v3_included) > 0 else 0
+
+    st.markdown(f"**Inkludierte Stocks — Schritte 1–9** (Secondary: {_n_secondary:,})")
     _mc1, _mc2, _mc3, _mc4, _mc5, _mc6 = st.columns(6)
     _mc1.metric("DM Stocks",       f"{len(_df_v3_dm):,}")
     _mc2.metric("EM Stocks",       f"{len(_df_v3_em):,}")
     _mc3.metric("DM FF MCap",      format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()))
     _mc4.metric("EM FF MCap",      format_bn(_df_v3_em["Free Float MCap Y2025"].sum()))
-    _mc5.metric("EM Weight",       f"{_em_v3_adj / _total_v3_adj * 100:.2f}%" if _total_v3_adj > 0 else "—")
-    _mc6.metric("Adj. EM Weight",  f"{_em_v3_weight:.2f}%")
+    _mc5.metric("EM Weight (Adj)", f"{_em_v3_weight:.2f}%")
+    _mc6.metric("Σ Gewichte",      f"{_sum_weights:.4f}%", delta="✓ OK" if abs(_sum_weights - 100) < 0.001 else "⚠ Prüfen")
 
-    # Country breakdown (using Adjusted Weight)
+    if _max_weight > 10:
+        st.warning(f"⚠️ Validierung: Größte Einzelposition = {_max_weight:.2f}% (Grenze: 10%)")
+
+    # Country breakdown (using Adj_FF_MCap / Index_Weight)
     _col_dm3, _col_em3 = st.columns(2)
-    _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_included.columns else "Exchange Country Name"
-    _total_adj_v3 = _df_v3_included["Adjusted FF MCap"].sum()
 
     with _col_dm3:
         st.markdown("**DM — Country Breakdown**")
         _dm3_c = _df_v3_dm.groupby(_map_col_v3).agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
-            Adj_MCap=("Adjusted FF MCap","sum"),
+            Adj_MCap=("Adj_FF_MCap","sum"),
         ).reset_index().sort_values("Adj_MCap", ascending=False)
-        _dm3_c["FF MCap (USD)"]     = _dm3_c["FF_MCap"].apply(format_bn)
-        _dm3_c["FF Weight (%)"]     = (_dm3_c["FF_MCap"] / _df_v3_dm["Free Float MCap Y2025"].sum() * 100).round(2)
-        _dm3_c["Adj. Weight (%)"]   = (_dm3_c["Adj_MCap"] / _total_adj_v3 * 100).round(2)
-        st.dataframe(_dm3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Adj. Weight (%)"]].rename(
+        _dm3_c["FF MCap (USD)"]   = _dm3_c["FF_MCap"].apply(format_bn)
+        _dm3_c["FF Weight (%)"]   = (_dm3_c["FF_MCap"] / _df_v3_dm["Free Float MCap Y2025"].sum() * 100).round(4)
+        _dm3_c["Index Weight (%)"]= (_dm3_c["Adj_MCap"] / _total_adj_v3 * 100).round(4)
+        st.dataframe(_dm3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Index Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
     with _col_em3:
@@ -1343,12 +1518,12 @@ with tab_v3:
         _em3_c = _df_v3_em.groupby(_map_col_v3).agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
-            Adj_MCap=("Adjusted FF MCap","sum"),
+            Adj_MCap=("Adj_FF_MCap","sum"),
         ).reset_index().sort_values("Adj_MCap", ascending=False)
-        _em3_c["FF MCap (USD)"]     = _em3_c["FF_MCap"].apply(format_bn)
-        _em3_c["FF Weight (%)"]     = (_em3_c["FF_MCap"] / _df_v3_em["Free Float MCap Y2025"].sum() * 100).round(2)
-        _em3_c["Adj. Weight (%)"]   = (_em3_c["Adj_MCap"] / _total_adj_v3 * 100).round(2)
-        st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Adj. Weight (%)"]].rename(
+        _em3_c["FF MCap (USD)"]   = _em3_c["FF_MCap"].apply(format_bn)
+        _em3_c["FF Weight (%)"]   = (_em3_c["FF_MCap"] / _df_v3_em["Free Float MCap Y2025"].sum() * 100).round(4)
+        _em3_c["Index Weight (%)"]= (_em3_c["Adj_MCap"] / _total_adj_v3 * 100).round(4)
+        st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Index Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
     # Download
