@@ -116,6 +116,7 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
                       gmsr_pct=0.85, em_gmsr_ratio=0.50,
                       auto_mult=1.15, cand_mult=0.50, buf_mult=0.33,
                       atvr_dm_min=0.20, atvr_em_min=0.15,
+                      adtv_dm_3m=2e6, adtv_dm_6m=2e6, adtv_em_3m=1e6, adtv_em_6m=1e6,
                       china_if=0.20, india_if=0.75, vietnam_if=0.50, saudi_if=0.50):
     """Full NaroIX V3 methodology — Steps 3-6.
     Implements EUMSS, ATVR, Inclusion Factors, GMSR and Zone assignment.
@@ -157,8 +158,8 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
                           df["_adtv_best"] * 252 / df["Total MCap Y2025"], 0)
 
     # ADTV 3M + 6M filter
-    mask_adtv_dm = (df["Classification"] == "DM") & (df["3M ADTV Y2025"] >= 2e6) & (df["6M ADTV Y2025"] >= 2e6)
-    mask_adtv_em = (df["Classification"] == "EM") & (df["3M ADTV Y2025"] >= 1e6) & (df["6M ADTV Y2025"] >= 1e6)
+    mask_adtv_dm = (df["Classification"] == "DM") & (df["3M ADTV Y2025"] >= adtv_dm_3m) & (df["6M ADTV Y2025"] >= adtv_dm_6m)
+    mask_adtv_em = (df["Classification"] == "EM") & (df["3M ADTV Y2025"] >= adtv_em_3m) & (df["6M ADTV Y2025"] >= adtv_em_6m)
     df["ADTV_Pass"] = mask_adtv_dm | mask_adtv_em
 
     # ATVR filter
@@ -1318,6 +1319,8 @@ with tab_v3:
         gmsr_pct=v3_gmsr_pct, em_gmsr_ratio=v3_em_gmsr_ratio,
         auto_mult=v3_auto_mult, cand_mult=v3_cand_mult, buf_mult=v3_buf_mult,
         atvr_dm_min=v3_atvr_dm_min, atvr_em_min=v3_atvr_em_min,
+        adtv_dm_3m=dm_min_adtv_3m, adtv_dm_6m=dm_min_adtv_6m,
+        adtv_em_3m=em_min_adtv_3m, adtv_em_6m=em_min_adtv_6m,
         china_if=china_inclusion_factor, india_if=india_inclusion_factor,
         vietnam_if=vietnam_inclusion_factor, saudi_if=saudi_inclusion_factor,
     )
