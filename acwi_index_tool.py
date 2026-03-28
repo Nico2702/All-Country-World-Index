@@ -653,8 +653,11 @@ with st.sidebar:
         _v3o, _v3p = st.columns([3, 4])
         with _v3o: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>BUFFER</div>", unsafe_allow_html=True)
         with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
+        use_gmsr_zones = st.checkbox("GMSR Zonen-Filter aktiv", value=False, key="v3_use_gmsr_zones",
+            help="Wenn aktiv: GMSR-Zonen (AUTO_INCLUDE/CANDIDATE/BUFFER/EXCLUDE) werden angewendet → weniger Stocks (~953). Wenn inaktiv: alle EUMSS+Liquidität qualifizierten Stocks direkt zur 85% Coverage → mehr Stocks (~2,400).")
         include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
-            help="Bei Erstberechnung ohne historischen State: BUFFER-Stocks trotzdem einschließen.")
+            help="Bei Erstberechnung ohne historischen State: BUFFER-Stocks trotzdem einschließen.",
+            disabled=not use_gmsr_zones)
         st.markdown("**ADTV (Schritt 4) — immer aktiv**")
         _v3u, _v3v = st.columns([3, 4])
         with _v3u: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM 3M & 6M (USD)</div>", unsafe_allow_html=True)
@@ -1500,10 +1503,15 @@ with tab_v3:
     st.plotly_chart(_fig_zone, use_container_width=True)
 
     # ── Step 7: 85% Coverage per country ────────────────────────────────────────
-    _included_zones = ["AUTO_INCLUDE", "CANDIDATE"]
-    if include_buffer:
-        _included_zones.append("BUFFER")
-    _df_v3_candidates = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
+    if use_gmsr_zones:
+        # With GMSR zones: only AUTO_INCLUDE + CANDIDATE (+ BUFFER if selected)
+        _included_zones = ["AUTO_INCLUDE", "CANDIDATE"]
+        if include_buffer:
+            _included_zones.append("BUFFER")
+        _df_v3_candidates = _df_v3[_df_v3["Zone"].isin(_included_zones)].copy()
+    else:
+        # Without GMSR zones: all stocks that passed EUMSS + Liquidity filters
+        _df_v3_candidates = _df_v3[_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"]].copy()
     _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_candidates.columns else "Exchange Country Name"
     _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3)
 
@@ -1603,10 +1611,16 @@ with tab_v3:
         _n_atvr_total = _n_atvr_dm + _n_atvr_em
         _diag_rows.append({"Schritt": "4b — Liquidität: ATVR", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_total, "Exkl. DM": f"-{_n_adtv_dm-_n_atvr_dm:,}", "Exkl. EM": f"-{_n_adtv_em-_n_atvr_em:,}", "Exkludiert": f"-{_n_adtv_total - _n_atvr_total:,}"})
 
-        _n_zone_dm = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="DM")).sum())
-        _n_zone_em = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="EM")).sum())
-        _n_zone_total = _n_zone_dm + _n_zone_em
-        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_total, "Exkl. DM": f"-{_n_atvr_dm-_n_zone_dm:,}", "Exkl. EM": f"-{_n_atvr_em-_n_zone_em:,}", "Exkludiert": f"-{_n_atvr_total - _n_zone_total:,}"})
+        if use_gmsr_zones:
+            _n_zone_dm = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="DM")).sum())
+            _n_zone_em = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="EM")).sum())
+            _n_zone_total = _n_zone_dm + _n_zone_em
+            _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_total, "Exkl. DM": f"-{_n_atvr_dm-_n_zone_dm:,}", "Exkl. EM": f"-{_n_atvr_em-_n_zone_em:,}", "Exkludiert": f"-{_n_atvr_total - _n_zone_total:,}"})
+        else:
+            _n_zone_dm = _n_atvr_dm
+            _n_zone_em = _n_atvr_em
+            _n_zone_total = _n_atvr_total
+            _diag_rows.append({"Schritt": "6 — Zonen (deaktiviert)", "DM": "—", "EM": "—", "Total": "—", "Exkl. DM": "—", "Exkl. EM": "—", "Exkludiert": "—"})
 
         _n_step7_dm = int((_df_v3_step7["Classification"]=="DM").sum())
         _n_step7_em = int((_df_v3_step7["Classification"]=="EM").sum())
