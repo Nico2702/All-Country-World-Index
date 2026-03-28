@@ -156,6 +156,12 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
     df["ATVR"] = np.where(df["Total MCap Y2025"] > 0,
                           df["_adtv_best"] * 252 / df["Total MCap Y2025"], 0)
 
+    # ADTV 3M + 6M filter
+    mask_adtv_dm = (df["Classification"] == "DM") & (df["3M ADTV Y2025"] >= 2e6) & (df["6M ADTV Y2025"] >= 2e6)
+    mask_adtv_em = (df["Classification"] == "EM") & (df["3M ADTV Y2025"] >= 1e6) & (df["6M ADTV Y2025"] >= 1e6)
+    df["ADTV_Pass"] = mask_adtv_dm | mask_adtv_em
+
+    # ATVR filter
     mask_atvr_dm = (df["Classification"] == "DM") & (df["ATVR"] >= atvr_dm_min)
     mask_atvr_em = (df["Classification"] == "EM") & (df["ATVR"] >= atvr_em_min)
     df["ATVR_Pass"] = mask_atvr_dm | mask_atvr_em
@@ -170,7 +176,7 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
     df["Adj_FF_MCap"] = df["Free Float MCap Y2025"] * df["Inclusion_Factor_V3"]
 
     # ── Step 6: Compute GMSR on EUMSS+ATVR filtered DM stocks using Adj_FF_MCap
-    mask_dm_pass = mask_eumss & df["ATVR_Pass"] & (df["Classification"] == "DM")
+    mask_dm_pass = mask_eumss & df["ADTV_Pass"] & df["ATVR_Pass"] & (df["Classification"] == "DM")
     df_dm_filtered = df[mask_dm_pass].sort_values("Total MCap Y2025", ascending=False).copy()
     total_adj_dm_f = df_dm_filtered["Adj_FF_MCap"].sum()
     if total_adj_dm_f == 0:
@@ -189,7 +195,7 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
 
     # Zone assignment (vectorized)
     ratio = np.where(df["GMSR_TITEL"] > 0, df["Total MCap Y2025"] / df["GMSR_TITEL"], 0)
-    zone = np.where(~mask_eumss | ~df["ATVR_Pass"],     "EXCLUDE",
+    zone = np.where(~mask_eumss | ~df["ADTV_Pass"] | ~df["ATVR_Pass"],  "EXCLUDE",
            np.where(ratio > auto_mult,                  "AUTO_INCLUDE",
            np.where(ratio >= cand_mult,                 "CANDIDATE",
            np.where(ratio >= buf_mult,                  "BUFFER",
@@ -1534,51 +1540,67 @@ with tab_v3:
 
         # FF MCap <= 0 (fixed universe filter)
         _n_ff_zero = len(df_raw_original) - len(_df_orig)
-        _diag_rows.append({"Schritt": "1a — FF MCap ≤ 0 / fehlend", "DM": "—", "EM": "—", "Total": f"-{_n_ff_zero:,}"})
+        _diag_rows.append({"Schritt": "1a — FF MCap ≤ 0 / fehlend", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_ff_zero:,}"})
 
         # HK CNY
         _n_hk = (_df_orig["Exchange Ticker"].str.contains("HKG", na=False) & (_df_orig["Trading Currency"] == "CNY")).sum() if exclude_hk_cny else 0
-        _diag_rows.append({"Schritt": "1b — HK (CNY)", "DM": "—", "EM": "—", "Total": f"-{_n_hk:,}"})
+        _diag_rows.append({"Schritt": "1b — HK (CNY)", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_hk:,}"})
 
         # Country of Risk = @
         _n_cor = (_df_orig["Country of Risk"].fillna("") == "@NA").sum() if exclude_country_risk_na else 0
-        _diag_rows.append({"Schritt": "1c — Country of Risk = @", "DM": "—", "EM": "—", "Total": f"-{_n_cor:,}"})
+        _diag_rows.append({"Schritt": "1c — Country of Risk = @NA", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_cor:,}"})
 
         # NAICS = Investment Funds
         _n_naics = _df_orig["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False).sum() if exclude_naics_funds else 0
-        _diag_rows.append({"Schritt": "1d — NAICS Investment Funds", "DM": "—", "EM": "—", "Total": f"-{_n_naics:,}"})
+        _diag_rows.append({"Schritt": "1d — NAICS Investment Funds", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_naics:,}"})
 
         # Exchange = Euro MTF / @
         _n_euro = _df_orig["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"]).sum() if exclude_euro_mtf else 0
-        _diag_rows.append({"Schritt": "1e — Exchange Euro MTF / @", "DM": "—", "EM": "—", "Total": f"-{_n_euro:,}"})
+        _diag_rows.append({"Schritt": "1e — Exchange Euro MTF / @NA", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_euro:,}"})
 
         # Name ETF / SICAV / %
         _etf_p = _re.compile(r'ETF|SICAV|%', _re.IGNORECASE)
         _n_etf = _df_orig["Name"].fillna("").str.contains(_etf_p).sum() if exclude_etf_sicav else 0
-        _diag_rows.append({"Schritt": "1f — Name: ETF / SICAV / %", "DM": "—", "EM": "—", "Total": f"-{_n_etf:,}"})
+        _diag_rows.append({"Schritt": "1f — Name: ETF / SICAV / %", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_etf:,}"})
 
         # Thailand Sec Type
         _th_excl = _df_orig["Exchange Name"].fillna("").str.upper() == "THAILAND"
         _th_type = "NVDR" if thailand_sec_type == "SHARE" else "SHARE"
         _n_thai = (_th_excl & (_df_orig["Sec Type"].fillna("") == _th_type)).sum()
-        _diag_rows.append({"Schritt": "1g — Thailand Sec Type", "DM": "—", "EM": "—", "Total": f"-{_n_thai:,}"})
+        _diag_rows.append({"Schritt": "1g — Thailand Sec Type", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_thai:,}"})
 
-        _n_after_excl = len(df_dm_full) + len(df_em_full)
-        _diag_rows.append({"Schritt": "2 — DM/EM Klassifikation", "DM": len(df_dm_full), "EM": len(df_em_full), "Total": len(df_dm_full)+len(df_em_full)})
+        _n_cls_total = len(df_dm_full) + len(df_em_full)
+        _diag_rows.append({"Schritt": "2 — DM/EM Klassifikation", "DM": len(df_dm_full), "EM": len(df_em_full), "Total": _n_cls_total, "Exkludiert": "—"})
 
         _n_eumss_dm = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="DM")).sum())
         _n_eumss_em = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="EM")).sum())
-        _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_dm+_n_eumss_em})
-        _n_atvr_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="DM")).sum())
-        _n_atvr_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="EM")).sum())
-        _diag_rows.append({"Schritt": "4 — ATVR Filter", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_dm+_n_atvr_em})
+        _n_eumss_total = _n_eumss_dm + _n_eumss_em
+        _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_total, "Exkludiert": f"-{_n_cls_total - _n_eumss_total:,}"})
+
+        # 4a: ADTV (3M & 6M)
+        _n_adtv_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & (_df_v3["Classification"]=="DM")).sum())
+        _n_adtv_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & (_df_v3["Classification"]=="EM")).sum())
+        _n_adtv_total = _n_adtv_dm + _n_adtv_em
+        _diag_rows.append({"Schritt": "4a — Liquidität: ADTV (3M & 6M)", "DM": _n_adtv_dm, "EM": _n_adtv_em, "Total": _n_adtv_total, "Exkludiert": f"-{_n_eumss_total - _n_adtv_total:,}"})
+
+        # 4b: ATVR
+        _n_atvr_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="DM")).sum())
+        _n_atvr_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="EM")).sum())
+        _n_atvr_total = _n_atvr_dm + _n_atvr_em
+        _diag_rows.append({"Schritt": "4b — Liquidität: ATVR", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_total, "Exkludiert": f"-{_n_adtv_total - _n_atvr_total:,}"})
+
         _n_zone_dm = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="DM")).sum())
         _n_zone_em = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="EM")).sum())
-        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_dm+_n_zone_em})
+        _n_zone_total = _n_zone_dm + _n_zone_em
+        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_total, "Exkludiert": f"-{_n_atvr_total - _n_zone_total:,}"})
+
         _n_step7_dm = int((_df_v3_step7["Classification"]=="DM").sum())
         _n_step7_em = int((_df_v3_step7["Classification"]=="EM").sum())
-        _diag_rows.append({"Schritt": "7 — 85% Coverage", "DM": _n_step7_dm, "EM": _n_step7_em, "Total": _n_step7_dm+_n_step7_em})
-        _diag_rows.append({"Schritt": "8 — Secondary (+)", "DM": int((_df_v3_dm).shape[0]), "EM": int((_df_v3_em).shape[0]), "Total": len(_df_v3_included)})
+        _n_step7_total = _n_step7_dm + _n_step7_em
+        _diag_rows.append({"Schritt": "7 — 85% Coverage", "DM": _n_step7_dm, "EM": _n_step7_em, "Total": _n_step7_total, "Exkludiert": f"-{_n_zone_total - _n_step7_total:,}"})
+
+        _n_final_total = len(_df_v3_included)
+        _diag_rows.append({"Schritt": "8 — Secondary (+)", "DM": int(_df_v3_dm.shape[0]), "EM": int(_df_v3_em.shape[0]), "Total": _n_final_total, "Exkludiert": f"+{_n_final_total - _n_step7_total:,}"})
         st.dataframe(pd.DataFrame(_diag_rows), use_container_width=True, hide_index=True)
         st.caption(f"EUMSS_FULL: {format_bn(_v3_eumss_full)} | EUMSS_FF: {format_bn(_v3_eumss_ff)} | DM GMSR: {format_bn(_v3_dm_gmsr)} | EM GMSR: {format_bn(_v3_em_gmsr)} | ATVR DM ≥ {v3_atvr_dm_min*100:.0f}% | ATVR EM ≥ {v3_atvr_em_min*100:.0f}%")
 
