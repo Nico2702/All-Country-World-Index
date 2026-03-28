@@ -1584,37 +1584,37 @@ with tab_v3:
         _diag_rows.append({"Schritt": "1g — Thailand Sec Type", "DM": "—", "EM": "—", "Total": "—", "Exkludiert": f"-{_n_thai:,}"})
 
         _n_cls_total = len(df_dm_full) + len(df_em_full)
-        _diag_rows.append({"Schritt": "2 — DM/EM Klassifikation", "DM": len(df_dm_full), "EM": len(df_em_full), "Total": _n_cls_total, "Exkludiert": "—"})
+        _diag_rows.append({"Schritt": "2 — DM/EM Klassifikation", "DM": len(df_dm_full), "EM": len(df_em_full), "Total": _n_cls_total, "Exkl. DM": "—", "Exkl. EM": "—", "Exkludiert": "—"})
 
         _n_eumss_dm = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="DM")).sum())
         _n_eumss_em = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="EM")).sum())
         _n_eumss_total = _n_eumss_dm + _n_eumss_em
-        _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_total, "Exkludiert": f"-{_n_cls_total - _n_eumss_total:,}"})
+        _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_total, "Exkl. DM": f"-{len(df_dm_full)-_n_eumss_dm:,}", "Exkl. EM": f"-{len(df_em_full)-_n_eumss_em:,}", "Exkludiert": f"-{_n_cls_total - _n_eumss_total:,}"})
 
         # 4a: ADTV (3M & 6M)
         _n_adtv_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & (_df_v3["Classification"]=="DM")).sum())
         _n_adtv_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & (_df_v3["Classification"]=="EM")).sum())
         _n_adtv_total = _n_adtv_dm + _n_adtv_em
-        _diag_rows.append({"Schritt": "4a — Liquidität: ADTV (3M & 6M)", "DM": _n_adtv_dm, "EM": _n_adtv_em, "Total": _n_adtv_total, "Exkludiert": f"-{_n_eumss_total - _n_adtv_total:,}"})
+        _diag_rows.append({"Schritt": "4a — Liquidität: ADTV (3M & 6M)", "DM": _n_adtv_dm, "EM": _n_adtv_em, "Total": _n_adtv_total, "Exkl. DM": f"-{_n_eumss_dm-_n_adtv_dm:,}", "Exkl. EM": f"-{_n_eumss_em-_n_adtv_em:,}", "Exkludiert": f"-{_n_eumss_total - _n_adtv_total:,}"})
 
         # 4b: ATVR
         _n_atvr_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="DM")).sum())
         _n_atvr_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="EM")).sum())
         _n_atvr_total = _n_atvr_dm + _n_atvr_em
-        _diag_rows.append({"Schritt": "4b — Liquidität: ATVR", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_total, "Exkludiert": f"-{_n_adtv_total - _n_atvr_total:,}"})
+        _diag_rows.append({"Schritt": "4b — Liquidität: ATVR", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_total, "Exkl. DM": f"-{_n_adtv_dm-_n_atvr_dm:,}", "Exkl. EM": f"-{_n_adtv_em-_n_atvr_em:,}", "Exkludiert": f"-{_n_adtv_total - _n_atvr_total:,}"})
 
         _n_zone_dm = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="DM")).sum())
         _n_zone_em = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="EM")).sum())
         _n_zone_total = _n_zone_dm + _n_zone_em
-        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_total, "Exkludiert": f"-{_n_atvr_total - _n_zone_total:,}"})
+        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_total, "Exkl. DM": f"-{_n_atvr_dm-_n_zone_dm:,}", "Exkl. EM": f"-{_n_atvr_em-_n_zone_em:,}", "Exkludiert": f"-{_n_atvr_total - _n_zone_total:,}"})
 
         _n_step7_dm = int((_df_v3_step7["Classification"]=="DM").sum())
         _n_step7_em = int((_df_v3_step7["Classification"]=="EM").sum())
         _n_step7_total = _n_step7_dm + _n_step7_em
-        _diag_rows.append({"Schritt": "7 — 85% Coverage", "DM": _n_step7_dm, "EM": _n_step7_em, "Total": _n_step7_total, "Exkludiert": f"-{_n_zone_total - _n_step7_total:,}"})
+        _diag_rows.append({"Schritt": "7 — 85% Coverage", "DM": _n_step7_dm, "EM": _n_step7_em, "Total": _n_step7_total, "Exkl. DM": f"-{_n_zone_dm-_n_step7_dm:,}", "Exkl. EM": f"-{_n_zone_em-_n_step7_em:,}", "Exkludiert": f"-{_n_zone_total - _n_step7_total:,}"})
 
         _n_final_total = len(_df_v3_included)
-        _diag_rows.append({"Schritt": "8 — Secondary (+)", "DM": int(_df_v3_dm.shape[0]), "EM": int(_df_v3_em.shape[0]), "Total": _n_final_total, "Exkludiert": f"+{_n_final_total - _n_step7_total:,}"})
+        _diag_rows.append({"Schritt": "8 — Secondary (+)", "DM": int(_df_v3_dm.shape[0]), "EM": int(_df_v3_em.shape[0]), "Total": _n_final_total, "Exkl. DM": f"+{int(_df_v3_dm.shape[0])-_n_step7_dm:,}", "Exkl. EM": f"+{int(_df_v3_em.shape[0])-_n_step7_em:,}", "Exkludiert": f"+{_n_final_total - _n_step7_total:,}"})
         st.dataframe(pd.DataFrame(_diag_rows), use_container_width=True, hide_index=True)
         st.caption(f"EUMSS_FULL: {format_bn(_v3_eumss_full)} | EUMSS_FF: {format_bn(_v3_eumss_ff)} | DM GMSR: {format_bn(_v3_dm_gmsr)} | EM GMSR: {format_bn(_v3_em_gmsr)} | ATVR DM ≥ {v3_atvr_dm_min*100:.0f}% | ATVR EM ≥ {v3_atvr_em_min*100:.0f}%")
 
