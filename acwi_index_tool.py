@@ -1681,6 +1681,199 @@ with tab_v3:
         st.dataframe(_em3_c[[_map_col_v3,"Stocks","FF MCap (USD)","FF Weight (%)","Index Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
+    # ── Segment Tables ───────────────────────────────────────────────────────────
+    st.markdown("---")
+    _v3_col_dm, _v3_col_em = st.columns(2)
+
+    with _v3_col_dm:
+        st.markdown("**DM Segments**")
+        _v3_dm_seg_rows = []
+        _v3_dm_sorted = _df_v3_dm.sort_values("Total MCap Y2025", ascending=False).copy()
+        _v3_dm_ff_total = _v3_dm_sorted["Free Float MCap Y2025"].sum()
+        if _v3_dm_ff_total > 0:
+            _v3_dm_sorted["_cum_pct"] = _v3_dm_sorted["Free Float MCap Y2025"].cumsum() / _v3_dm_ff_total * 100
+            _v3_dm_sorted["_seg"] = np.where(_v3_dm_sorted["_cum_pct"] <= large_thr, "Large Cap",
+                                    np.where(_v3_dm_sorted["_cum_pct"] <= mid_thr,   "Mid Cap", "Small Cap"))
+        else:
+            _v3_dm_sorted["_seg"] = "Small Cap"
+        for _seg in ["Large Cap", "Mid Cap"]:
+            _s = _v3_dm_sorted[_v3_dm_sorted["_seg"] == _seg]
+            _v3_dm_seg_rows.append({"Segment": _seg, "# Stocks": len(_s),
+                "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—"})
+        _v3_dm_seg_rows.append({"Segment": "Total Stocks - World Index", "# Stocks": len(_df_v3_dm),
+            "FF MCap (USD)": format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(_df_v3_dm["Free Float MCap Y2025"].mean()) if len(_df_v3_dm) > 0 else "—"})
+        _sc = _v3_dm_sorted[_v3_dm_sorted["_seg"] == "Small Cap"]
+        _v3_dm_seg_rows.append({"Segment": "Small Cap", "# Stocks": len(_sc),
+            "FF MCap (USD)": format_bn(_sc["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(_sc["Free Float MCap Y2025"].mean()) if len(_sc) > 0 else "—"})
+        _v3_dm_seg_rows.append({"Segment": "Total Universe", "# Stocks": len(_df_v3_dm),
+            "FF MCap (USD)": format_bn(_df_v3_dm["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(_df_v3_dm["Free Float MCap Y2025"].mean()) if len(_df_v3_dm) > 0 else "—"})
+        st.dataframe(style_segment_table(pd.DataFrame(_v3_dm_seg_rows),
+            ["Large Cap","Mid Cap","Total Stocks - World Index"]),
+            use_container_width=True, hide_index=True)
+
+        # DM Country breakdown
+        st.markdown(f"**DM Included ({len(_df_v3_dm):,} Stocks)**")
+        _v3_all_dm_c = sorted(_df_v3_dm[_map_col_v3].dropna().unique())
+        _v3_dm_ctry = _df_v3_dm.groupby(_map_col_v3).agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_Total_MCap=("Total MCap Y2025","mean")).reset_index()
+        _v3_dm_ctry_full = pd.DataFrame({_map_col_v3: _v3_all_dm_c}).merge(_v3_dm_ctry, on=_map_col_v3, how="left")
+        _v3_dm_ctry_full["Stocks"] = _v3_dm_ctry_full["Stocks"].fillna(0).astype(int)
+        _v3_dm_ctry_full["FF_MCap"] = _v3_dm_ctry_full["FF_MCap"].fillna(0)
+        _v3_dm_ctry_full = _v3_dm_ctry_full.sort_values("FF_MCap", ascending=False)
+        _v3_dm_ff_sum = _v3_dm_ctry_full["FF_MCap"].sum()
+        _v3_dm_ctry_full["FF MCap (USD)"] = _v3_dm_ctry_full["FF_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        _v3_dm_ctry_full["Avg Total MCap"] = _v3_dm_ctry_full["Avg_Total_MCap"].apply(lambda x: format_bn(x) if x and x > 0 else "—")
+        _v3_dm_ctry_full["Weight (%)"] = (_v3_dm_ctry_full["FF_MCap"] / _v3_dm_ff_sum * 100).round(2)
+        st.dataframe(_v3_dm_ctry_full[[_map_col_v3,"Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]].rename(
+            columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
+
+    with _v3_col_em:
+        st.markdown("**EM Segments**")
+        _v3_em_seg_rows = []
+        _v3_em_sorted = _df_v3_em.sort_values("Total MCap Y2025", ascending=False).copy()
+        _v3_em_ff_total = _v3_em_sorted["Free Float MCap Y2025"].sum()
+        if _v3_em_ff_total > 0:
+            _v3_em_sorted["_cum_pct"] = _v3_em_sorted["Free Float MCap Y2025"].cumsum() / _v3_em_ff_total * 100
+            _v3_em_sorted["_seg"] = np.where(_v3_em_sorted["_cum_pct"] <= large_thr, "Large Cap", "Mid Cap")
+        else:
+            _v3_em_sorted["_seg"] = "Mid Cap"
+        for _seg in ["Large Cap", "Mid Cap"]:
+            _s = _v3_em_sorted[_v3_em_sorted["_seg"] == _seg]
+            _v3_em_seg_rows.append({"Segment": _seg, "# Stocks": len(_s),
+                "FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].sum()),
+                "Avg FF MCap (USD)": format_bn(_s["Free Float MCap Y2025"].mean()) if len(_s) > 0 else "—"})
+        _v3_em_seg_rows.append({"Segment": "Total Stocks - EM", "# Stocks": len(_df_v3_em),
+            "FF MCap (USD)": format_bn(_df_v3_em["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(_df_v3_em["Free Float MCap Y2025"].mean()) if len(_df_v3_em) > 0 else "—"})
+        _v3_em_seg_rows.append({"Segment": "Small Cap", "# Stocks": "—", "FF MCap (USD)": "—", "Avg FF MCap (USD)": "—"})
+        _v3_em_seg_rows.append({"Segment": "Total Universe", "# Stocks": len(_df_v3_em),
+            "FF MCap (USD)": format_bn(_df_v3_em["Free Float MCap Y2025"].sum()),
+            "Avg FF MCap (USD)": format_bn(_df_v3_em["Free Float MCap Y2025"].mean()) if len(_df_v3_em) > 0 else "—"})
+        st.dataframe(style_segment_table(pd.DataFrame(_v3_em_seg_rows),
+            ["Large Cap","Mid Cap","Total Stocks - EM"]),
+            use_container_width=True, hide_index=True)
+
+        # EM Country breakdown
+        st.markdown(f"**EM Included ({len(_df_v3_em):,} Stocks)**")
+        _v3_all_em_c = sorted(_df_v3_em[_map_col_v3].dropna().unique())
+        _v3_em_ctry = _df_v3_em.groupby(_map_col_v3).agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_Total_MCap=("Total MCap Y2025","mean")).reset_index()
+        _v3_em_ctry_full = pd.DataFrame({_map_col_v3: _v3_all_em_c}).merge(_v3_em_ctry, on=_map_col_v3, how="left")
+        _v3_em_ctry_full["Stocks"] = _v3_em_ctry_full["Stocks"].fillna(0).astype(int)
+        _v3_em_ctry_full["FF_MCap"] = _v3_em_ctry_full["FF_MCap"].fillna(0)
+        _v3_em_ctry_full = _v3_em_ctry_full.sort_values("FF_MCap", ascending=False)
+        _v3_em_ff_sum = _v3_em_ctry_full["FF_MCap"].sum()
+        _v3_em_ctry_full["FF MCap (USD)"] = _v3_em_ctry_full["FF_MCap"].apply(lambda x: format_bn(x) if x > 0 else "—")
+        _v3_em_ctry_full["Avg Total MCap"] = _v3_em_ctry_full["Avg_Total_MCap"].apply(lambda x: format_bn(x) if x and x > 0 else "—")
+        _v3_em_ctry_full["Weight (%)"] = (_v3_em_ctry_full["FF_MCap"] / _v3_em_ff_sum * 100).round(2)
+        st.dataframe(_v3_em_ctry_full[[_map_col_v3,"Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]].rename(
+            columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
+
+    # ── Country Charts ────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**V3 — Länderübersicht**")
+    _v3_country_basis = st.radio("Länder-Basis:", ["Mapping Country","Country of Incorp","Exchange Country Name"],
+        index=0, horizontal=True, key="v3_country_basis",
+        help="Basis für die Ländergruppierung in den Charts.")
+    _v3_cb = _v3_country_basis if _v3_country_basis in _df_v3_included.columns else "Exchange Country Name"
+
+    _v3_all_adj2 = add_adjusted_weight(_df_v3_included, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+    _v3_total_stocks = len(_v3_all_adj2)
+    _v3_total_adj2 = _v3_all_adj2["Adjusted FF MCap"].sum()
+
+    _v3_cagg = _v3_all_adj2.groupby([_v3_cb,"Classification"]).agg(
+        Stocks=("Symbol","count"), Adj_MCap=("Adjusted FF MCap","sum")).reset_index()
+    _v3_cagg["Stock %"] = (_v3_cagg["Stocks"] / _v3_total_stocks * 100).round(2)
+    _v3_cagg["Adj Weight %"] = (_v3_cagg["Adj_MCap"] / _v3_total_adj2 * 100).round(2)
+
+    _v3_by_stocks = _v3_cagg.groupby(_v3_cb).agg(Stocks=("Stocks","sum"), Stock_Pct=("Stock %","sum")).reset_index().sort_values("Stocks", ascending=False)
+    _v3_by_weight = _v3_cagg.groupby(_v3_cb).agg(Adj_MCap=("Adj_MCap","sum"), Weight_Pct=("Adj Weight %","sum")).reset_index().sort_values("Adj_MCap", ascending=False)
+
+    def _v3_add_others(df, val_col, pct_col, n=30):
+        top = df.head(n).copy()
+        rest = df.iloc[n:]
+        if len(rest) > 0:
+            top = pd.concat([pd.DataFrame([{_v3_cb: f"Others ({len(rest)} Länder)", val_col: rest[val_col].sum(), pct_col: rest[pct_col].sum()}]), top], ignore_index=True)
+        return top.sort_values(val_col, ascending=True)
+
+    _v3_by_stocks_c = _v3_add_others(_v3_by_stocks, "Stocks", "Stock_Pct")
+    _v3_by_weight_c = _v3_add_others(_v3_by_weight, "Adj_MCap", "Weight_Pct")
+
+    _vc1, _vc2 = st.columns(2)
+    with _vc1:
+        st.markdown("**Nach Anzahl Stocks (%)**")
+        _fig_v3_stocks = go.Figure(go.Bar(
+            x=_v3_by_stocks_c["Stock_Pct"], y=_v3_by_stocks_c[_v3_cb], orientation="h",
+            marker_color="#2979ff",
+            text=_v3_by_stocks_c["Stock_Pct"].apply(lambda x: f"{x:.2f}%"), textposition="outside"))
+        _fig_v3_stocks.update_layout(template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60), xaxis=dict(showgrid=False))
+        st.plotly_chart(_fig_v3_stocks, use_container_width=True)
+    with _vc2:
+        st.markdown("**Nach Gewicht (Adj. FF MCap %)**")
+        _fig_v3_weight = go.Figure(go.Bar(
+            x=_v3_by_weight_c["Weight_Pct"], y=_v3_by_weight_c[_v3_cb], orientation="h",
+            marker_color="#ce93d8",
+            text=_v3_by_weight_c["Weight_Pct"].apply(lambda x: f"{x:.2f}%"), textposition="outside"))
+        _fig_v3_weight.update_layout(template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60), xaxis=dict(showgrid=False))
+        st.plotly_chart(_fig_v3_weight, use_container_width=True)
+
+    # ── Donut + Inclusion Factor Impact ──────────────────────────────────────
+    _v3_donut_data = []
+    for _cls in ["DM","EM"]:
+        _ff = _df_v3_included[_df_v3_included["Classification"]==_cls]["Free Float MCap Y2025"].sum()
+        if _ff > 0: _v3_donut_data.append({"Label": _cls, "FF MCap": _ff, "Type": _cls})
+    _v3_donut_df = pd.DataFrame(_v3_donut_data)
+
+    _vd1, _vd2 = st.columns([1,1])
+    with _vd1:
+        st.markdown("**V3 Composition (DM vs EM)**")
+        _fig_v3_donut = px.pie(_v3_donut_df, names="Label", values="FF MCap",
+            color="Type", color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"},
+            template="plotly_dark", hole=0.45)
+        _fig_v3_donut.update_layout(paper_bgcolor="#0f1117", height=350, margin=dict(t=10,b=10))
+        st.plotly_chart(_fig_v3_donut, use_container_width=True)
+
+    with _vd2:
+        st.markdown("**Inclusion Factor Impact**")
+        _v3_if_map = {"China A-Shares":(["SHANGHAI","SHENZHEN"],china_inclusion_factor),
+                      "Indien":(["BSE INDIA","NSE INDIA"],india_inclusion_factor),
+                      "Vietnam":(["HANOI STOCK EXCHANGE","VIETNAM"],vietnam_inclusion_factor),
+                      "Saudi-Arabien":(["SAUDI ARABIA"],saudi_inclusion_factor)}
+        _v3_if_rows = []
+        _v3_total_ff_raw = _df_v3_included["Free Float MCap Y2025"].sum()
+        _v3_if_full = add_adjusted_weight(_df_v3_included, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        _v3_total_adj_if = _v3_if_full["Adjusted FF MCap"].sum()
+        for _name, (_exch, _factor) in _v3_if_map.items():
+            _mask = _v3_if_full["Exchange Name"].isin(_exch)
+            _ff = _v3_if_full.loc[_mask,"Free Float MCap Y2025"].sum()
+            _adj = _v3_if_full.loc[_mask,"Adjusted FF MCap"].sum()
+            if _ff > 0:
+                _v3_if_rows.append({"Land": _name, "Factor": f"{_factor*100:.0f}%",
+                    "Weight (vor)": round(_ff/_v3_total_ff_raw*100,4),
+                    "Weight (nach)": round(_adj/_v3_total_adj_if*100,4),
+                    "Δ": round(_adj/_v3_total_adj_if*100 - _ff/_v3_total_ff_raw*100,4)})
+        if _v3_if_rows:
+            _v3_if_df = pd.DataFrame(_v3_if_rows)
+            _v3_if_df = pd.concat([_v3_if_df, pd.DataFrame([{"Land":"Total Weight","Factor":"—",
+                "Weight (vor)": round(_v3_if_df["Weight (vor)"].sum(),4),
+                "Weight (nach)": round(_v3_if_df["Weight (nach)"].sum(),4),
+                "Δ": round(_v3_if_df["Δ"].sum(),4)}])], ignore_index=True)
+            def _style_v3_if(df):
+                def row_style(row):
+                    if row["Land"] == "Total Weight":
+                        return ["background-color: #1a2a4a; font-weight: 600;"] * len(row)
+                    return [""] * len(row)
+                return df.style.apply(row_style, axis=1)
+            st.dataframe(_style_v3_if(_v3_if_df), use_container_width=True, hide_index=True)
+
     # Download
     _v3_universe = _df_v3.copy()
     _v3_universe = _v3_universe[[c for c in _v3_universe.columns if c not in ["cum_ff","EUMSS_Pass"]]]
