@@ -845,7 +845,7 @@ if exclude_hk_cny:
 
 # Exclude Country of Risk = @
 if exclude_country_risk_na and "Country of Risk" in df_raw.columns:
-    df_raw = df_raw[df_raw["Country of Risk"].fillna("") != "@"].copy()
+    df_raw = df_raw[df_raw["Country of Risk"].fillna("") != "@NA"].copy()
 
 # Exclude NAICS = Open-End Investment Funds
 if exclude_naics_funds and "NAICS" in df_raw.columns:
@@ -853,7 +853,7 @@ if exclude_naics_funds and "NAICS" in df_raw.columns:
 
 # Exclude Exchange Name = Euro MTF or @
 if exclude_euro_mtf:
-    df_raw = df_raw[~df_raw["Exchange Name"].fillna("").isin(["Euro MTF", "@"])].copy()
+    df_raw = df_raw[~df_raw["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])].copy()
 
 # Exclude Name contains standalone word ETF, SICAV or %
 if exclude_etf_sicav:
@@ -1494,7 +1494,7 @@ with tab_v3:
         _diag_rows.append({"Schritt": "1b — HK (CNY)", "DM": "—", "EM": "—", "Total": f"-{_n_hk:,}"})
 
         # Country of Risk = @
-        _n_cor = (_df_orig["Country of Risk"].fillna("") == "@").sum() if exclude_country_risk_na else 0
+        _n_cor = (_df_orig["Country of Risk"].fillna("") == "@NA").sum() if exclude_country_risk_na else 0
         _diag_rows.append({"Schritt": "1c — Country of Risk = @", "DM": "—", "EM": "—", "Total": f"-{_n_cor:,}"})
 
         # NAICS = Investment Funds
@@ -1502,7 +1502,7 @@ with tab_v3:
         _diag_rows.append({"Schritt": "1d — NAICS Investment Funds", "DM": "—", "EM": "—", "Total": f"-{_n_naics:,}"})
 
         # Exchange = Euro MTF / @
-        _n_euro = _df_orig["Exchange Name"].fillna("").isin(["Euro MTF", "@"]).sum() if exclude_euro_mtf else 0
+        _n_euro = _df_orig["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"]).sum() if exclude_euro_mtf else 0
         _diag_rows.append({"Schritt": "1e — Exchange Euro MTF / @", "DM": "—", "EM": "—", "Total": f"-{_n_euro:,}"})
 
         # Name ETF / SICAV / %
