@@ -1432,6 +1432,36 @@ with tab_v3:
     )
     st.plotly_chart(_fig_zone, use_container_width=True)
 
+    # ── Pipeline Diagnostics ─────────────────────────────────────────────────────
+    with st.expander("🔍 Pipeline Diagnostik — Stocks je Schritt", expanded=True):
+        _diag_rows = []
+
+        # Step 3: EUMSS
+        _n_eumss_dm = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="DM")).sum())
+        _n_eumss_em = int((_df_v3["EUMSS_Pass"] & (_df_v3["Classification"]=="EM")).sum())
+        _diag_rows.append({"Schritt": "3 — EUMSS Filter", "DM": _n_eumss_dm, "EM": _n_eumss_em, "Total": _n_eumss_dm+_n_eumss_em})
+
+        # Step 4: ATVR
+        _n_atvr_dm = int((_df_v3["EUMSS_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="DM")).sum())
+        _n_atvr_em = int((_df_v3["EUMSS_Pass"] & _df_v3["ATVR_Pass"] & (_df_v3["Classification"]=="EM")).sum())
+        _diag_rows.append({"Schritt": "4 — ATVR Filter", "DM": _n_atvr_dm, "EM": _n_atvr_em, "Total": _n_atvr_dm+_n_atvr_em})
+
+        # Step 6: After zone assignment (AUTO_INCLUDE + CANDIDATE)
+        _n_zone_dm = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="DM")).sum())
+        _n_zone_em = int((_df_v3["Zone"].isin(["AUTO_INCLUDE","CANDIDATE"]) & (_df_v3["Classification"]=="EM")).sum())
+        _diag_rows.append({"Schritt": "6 — Zonen (AUTO+CAND)", "DM": _n_zone_dm, "EM": _n_zone_em, "Total": _n_zone_dm+_n_zone_em})
+
+        # Step 7: After 85% coverage
+        _n_step7_dm = int((_df_v3_step7["Classification"]=="DM").sum())
+        _n_step7_em = int((_df_v3_step7["Classification"]=="EM").sum())
+        _diag_rows.append({"Schritt": "7 — 85% Coverage", "DM": _n_step7_dm, "EM": _n_step7_em, "Total": _n_step7_dm+_n_step7_em})
+
+        # Step 8: Secondary
+        _diag_rows.append({"Schritt": "8 — Secondary (+)", "DM": int((_df_v3_included["Classification"]=="DM").sum()), "EM": int((_df_v3_included["Classification"]=="EM").sum()), "Total": len(_df_v3_included)})
+
+        st.dataframe(pd.DataFrame(_diag_rows), use_container_width=True, hide_index=True)
+        st.caption(f"EUMSS_FULL: {format_bn(_v3_eumss_full)} | EUMSS_FF: {format_bn(_v3_eumss_ff)} | DM GMSR: {format_bn(_v3_dm_gmsr)} | EM GMSR: {format_bn(_v3_em_gmsr)} | ATVR DM ≥ {v3_atvr_dm_min*100:.0f}% | ATVR EM ≥ {v3_atvr_em_min*100:.0f}%")
+
     # ── Step 7: 85% Coverage per country ────────────────────────────────────────
     _included_zones = ["AUTO_INCLUDE", "CANDIDATE"]
     if include_buffer:
