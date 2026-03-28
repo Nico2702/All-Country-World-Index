@@ -1323,6 +1323,53 @@ with tab_v3:
     _km3.metric("DM GMSR (85% Cutoff)",         format_bn(_v3_dm_gmsr))
     _km4.metric("EM GMSR (50% × DM GMSR)",      format_bn(_v3_em_gmsr))
 
+    # Definitions table
+    with st.expander("📖 Begriffsdefinitionen & Berechnete Werte", expanded=False):
+        _def_html = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#0f1117;color:#8892b0;text-align:left;">
+            <th style="padding:8px 12px;width:15%;">Begriff</th>
+            <th style="padding:8px 12px;width:18%;">Berechneter Wert</th>
+            <th style="padding:8px 12px;">Definition</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#161b27;">
+            <td style="padding:10px 12px;color:#42a5f5;font-weight:700;">EUMSS</td>
+            <td style="padding:10px 12px;color:#e8eaf6;">—</td>
+            <td style="padding:10px 12px;color:#8892b0;">Equity Universe Minimum Size Standard. Oberbegriff für die Mindestgrößenanforderung die ein Titel erfüllen muss um überhaupt in das investierbare Universum aufgenommen zu werden. Kein fester Zahlenwert — wird bei jedem Lauf neu aus den Daten berechnet.</td>
+          </tr>
+          <tr style="background:#1a1f2e;">
+            <td style="padding:10px 12px;color:#42a5f5;font-weight:700;">EUMSS_FULL</td>
+            <td style="padding:10px 12px;color:#e8eaf6;font-weight:600;">{format_bn(_v3_eumss_full)} USD</td>
+            <td style="padding:10px 12px;color:#8892b0;">Konkreter Zahlenwert des EUMSS als Total Market Cap. Berechnung: alle DM-Titel nach Total MCap absteigend sortieren, Free Float MCap kumuliert aufaddieren, der Total MCap des Titels an der {v3_eumss_pct*100:.0f}%-Marke = EUMSS_FULL. Verwendung: untere Grenze für die Total MCap jedes Titels.</td>
+          </tr>
+          <tr style="background:#161b27;">
+            <td style="padding:10px 12px;color:#42a5f5;font-weight:700;">EUMSS_FF</td>
+            <td style="padding:10px 12px;color:#e8eaf6;font-weight:600;">{format_bn(_v3_eumss_ff)} USD</td>
+            <td style="padding:10px 12px;color:#8892b0;">Untere Grenze für die Free Float MCap jedes Titels. Berechnung: EUMSS_FF = EUMSS_FULL × {v3_eumss_ff_ratio*100:.0f}%. Fixer Abschlag — keine eigene Kalibrierung. Stellt sicher dass auch der tatsächlich handelbare Anteil ausreichend groß ist.</td>
+          </tr>
+          <tr style="background:#1a1f2e;">
+            <td style="padding:10px 12px;color:#66bb6a;font-weight:700;">GMSR</td>
+            <td style="padding:10px 12px;color:#e8eaf6;">—</td>
+            <td style="padding:10px 12px;color:#8892b0;">Global Minimum Size Reference. Oberbegriff für den Referenzpunkt der die Segmentgrenze definiert. Bestimmt wo die Grenze zwischen Standard Index (Large + Mid Cap) und Small Cap liegt. Kein Ausschlussfilter wie EUMSS — sondern eine Segmenteinteilung. Wird bei jedem Lauf neu berechnet.</td>
+          </tr>
+          <tr style="background:#161b27;">
+            <td style="padding:10px 12px;color:#66bb6a;font-weight:700;">DM_GMSR</td>
+            <td style="padding:10px 12px;color:#e8eaf6;font-weight:600;">{format_bn(_v3_dm_gmsr)} USD</td>
+            <td style="padding:10px 12px;color:#8892b0;">Konkreter Zahlenwert des GMSR für Developed Markets. Berechnung: alle verbleibenden DM-Titel nach Total MCap absteigend sortieren, Adj_FF_MCap kumuliert aufaddieren, der Total MCap des Titels an der {v3_gmsr_pct*100:.0f}%-Marke = DM_GMSR. Ankerpunkt für alle vier Zonenschwellen (× {v3_auto_mult} / × {v3_cand_mult} / × {v3_buf_mult}).</td>
+          </tr>
+          <tr style="background:#1a1f2e;">
+            <td style="padding:10px 12px;color:#66bb6a;font-weight:700;">EM_GMSR</td>
+            <td style="padding:10px 12px;color:#e8eaf6;font-weight:600;">{format_bn(_v3_em_gmsr)} USD</td>
+            <td style="padding:10px 12px;color:#8892b0;">Konkreter Zahlenwert des GMSR für Emerging Markets. Berechnung: EM_GMSR = DM_GMSR × {v3_em_gmsr_ratio*100:.0f}%. Fixer MSCI-Parameter — keine eigene Kalibrierung. EM-Unternehmen sind strukturell kleiner als DM-Unternehmen; gleicher GMSR würde viele EM-Länder aus dem Index drängen.</td>
+          </tr>
+        </tbody>
+        </table>
+        """
+        st.markdown(_def_html, unsafe_allow_html=True)
+
     # GMSR cards + zone matrix
     st.markdown("---")
     _gc1, _gc2 = st.columns(2)
