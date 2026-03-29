@@ -1930,6 +1930,37 @@ with tab_v3:
     _v3_acwi_tab = _df_v3_included.copy()
     _v3_acwi_tab = _v3_acwi_tab[[c for c in _v3_acwi_tab.columns if c not in _drop_cols]]
 
+    # Tab 6: Parameter Settings
+    _v3_params = pd.DataFrame([
+        {"Parameter": "Listing Universe",          "Wert": v3_listing_mode},
+        {"Parameter": "85% Coverage Basis",        "Wert": "Adj. FF MCap" if coverage_on_adj else "Raw FF MCap"},
+        {"Parameter": "EUMSS Kalibrierung (%)",    "Wert": f"{v3_eumss_pct*100:.0f}%"},
+        {"Parameter": "EUMSS_FULL (USD)",          "Wert": format_bn(_v3_eumss_full)},
+        {"Parameter": "EUMSS_FF Ratio (%)",        "Wert": f"{v3_eumss_ff_ratio*100:.0f}%"},
+        {"Parameter": "EUMSS_FF (USD)",            "Wert": format_bn(_v3_eumss_ff)},
+        {"Parameter": "Min. Free Float (%)",       "Wert": f"{v3_min_ff_pct*100:.0f}%"},
+        {"Parameter": "DM ADTV 3M & 6M (USD)",    "Wert": f"{v3_adtv_dm:,.0f}"},
+        {"Parameter": "EM ADTV 3M & 6M (USD)",    "Wert": f"{v3_adtv_em:,.0f}"},
+        {"Parameter": "ATVR DM Min. (%)",          "Wert": f"{v3_atvr_dm_min*100:.0f}%"},
+        {"Parameter": "ATVR EM Min. (%)",          "Wert": f"{v3_atvr_em_min*100:.0f}%"},
+        {"Parameter": "GMSR Zonen aktiv",          "Wert": "Ja" if use_gmsr_zones else "Nein"},
+        {"Parameter": "GMSR Kalibrierung (%)",     "Wert": f"{v3_gmsr_pct*100:.0f}%"},
+        {"Parameter": "DM_GMSR (USD)",             "Wert": format_bn(_v3_dm_gmsr)},
+        {"Parameter": "EM GMSR Ratio (%)",         "Wert": f"{v3_em_gmsr_ratio*100:.0f}%"},
+        {"Parameter": "EM_GMSR (USD)",             "Wert": format_bn(_v3_em_gmsr)},
+        {"Parameter": "Zone AUTO_INCLUDE (×)",     "Wert": f"{v3_auto_mult}×"},
+        {"Parameter": "Zone CANDIDATE (×)",        "Wert": f"{v3_cand_mult}×"},
+        {"Parameter": "Zone BUFFER (×)",           "Wert": f"{v3_buf_mult}×"},
+        {"Parameter": "BUFFER einschließen",       "Wert": "Ja" if include_buffer else "Nein"},
+        {"Parameter": "China A-Share IF (%)",      "Wert": f"{china_inclusion_factor*100:.0f}%"},
+        {"Parameter": "Indien IF (%)",             "Wert": f"{india_inclusion_factor*100:.0f}%"},
+        {"Parameter": "Vietnam IF (%)",            "Wert": f"{vietnam_inclusion_factor*100:.0f}%"},
+        {"Parameter": "Saudi-Arabien IF (%)",      "Wert": f"{saudi_inclusion_factor*100:.0f}%"},
+        {"Parameter": "Total Konstituenten",       "Wert": len(_df_v3_included)},
+        {"Parameter": "DM Stocks",                 "Wert": len(_v3_dm_tab)},
+        {"Parameter": "EM Stocks",                 "Wert": len(_v3_em_tab)},
+    ])
+
     st.download_button(
         "⬇️ Download Variant 3 as Excel",
         data=to_excel_multi({
@@ -1938,6 +1969,7 @@ with tab_v3:
             "DM":                       _v3_dm_tab,
             "EM":                       _v3_em_tab,
             "ACWI":                     _v3_acwi_tab,
+            "Parameter Settings":       _v3_params,
         }),
         file_name="NaroIX_Variant3_Dynamic.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
