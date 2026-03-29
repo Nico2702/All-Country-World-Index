@@ -820,6 +820,54 @@ with st.sidebar:
         except: saudi_inclusion_factor = 0.50
 
     st.markdown("---")
+    st.markdown("### 🆕 Neue Indizes — Gemeinsame Parameter")
+    st.caption("Gelten für Tab 7 (Global Sort), Tab 8 (Per Country) und Tab 9 (GIMI Method)")
+
+    with st.expander("⚙️ Universe & Liquidität", expanded=True):
+        st.markdown("**Thailand**")
+        _new_thai = st.radio("Sec Type:", ["NVDR", "SHARE"], index=0,
+            horizontal=True, key="new_thai_sec",
+            help="NVDR: als Secondary trotzdem behalten (investierbare Klasse für Ausländer). SHARE: normaler Primary.")
+
+        st.markdown("**Max Closing Price**")
+        _new_price_a, _new_price_b = st.columns([3,4])
+        with _new_price_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Max Price (USD)</div>", unsafe_allow_html=True)
+        with _new_price_b: _new_price_raw = st.text_input("Max Price", value="20000", key="new_max_price", label_visibility="collapsed")
+        try:    new_max_price = float(_new_price_raw.replace(",",""))
+        except: new_max_price = 20000.0
+
+        st.markdown("**ADTV 3M & 6M**")
+        _nadtv_a, _nadtv_b = st.columns([3,4])
+        with _nadtv_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM (USD)</div>", unsafe_allow_html=True)
+        with _nadtv_b: _new_adtv_dm_raw = st.text_input("DM ADTV", value="1500000", key="new_adtv_dm", label_visibility="collapsed")
+        _nadtv_c, _nadtv_d = st.columns([3,4])
+        with _nadtv_c: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM (USD)</div>", unsafe_allow_html=True)
+        with _nadtv_d: _new_adtv_em_raw = st.text_input("EM ADTV", value="750000", key="new_adtv_em", label_visibility="collapsed")
+        try:    new_adtv_dm = float(_new_adtv_dm_raw.replace(",",""))
+        except: new_adtv_dm = 1_500_000.0
+        try:    new_adtv_em = float(_new_adtv_em_raw.replace(",",""))
+        except: new_adtv_em = 750_000.0
+
+        st.markdown("**ATVR Min.**")
+        _natvr_a, _natvr_b = st.columns([3,4])
+        with _natvr_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM (%)</div>", unsafe_allow_html=True)
+        with _natvr_b: _new_atvr_dm_raw = st.text_input("DM ATVR", value="0", key="new_atvr_dm", label_visibility="collapsed")
+        _natvr_c, _natvr_d = st.columns([3,4])
+        with _natvr_c: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM (%)</div>", unsafe_allow_html=True)
+        with _natvr_d: _new_atvr_em_raw = st.text_input("EM ATVR", value="0", key="new_atvr_em", label_visibility="collapsed")
+        try:    new_atvr_dm = float(_new_atvr_dm_raw) / 100
+        except: new_atvr_dm = 0.0
+        try:    new_atvr_em = float(_new_atvr_em_raw) / 100
+        except: new_atvr_em = 0.0
+
+        st.markdown("**GIMI Spezifisch**")
+        _ngimi_a, _ngimi_b = st.columns([3,4])
+        with _ngimi_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EUMSS FF Ratio (%)</div>", unsafe_allow_html=True)
+        with _ngimi_b: _new_eumss_ff_raw = st.text_input("EUMSS FF Ratio", value="50", key="new_eumss_ff", label_visibility="collapsed")
+        try:    new_eumss_ff_ratio = float(_new_eumss_ff_raw) / 100
+        except: new_eumss_ff_ratio = 0.50
+
+    st.markdown("---")
     st.markdown("<div style='color:#8892b0;font-size:11px;'>NaroIX Index Construction Tool<br/>© 2025 NaroIX</div>", unsafe_allow_html=True)
 
 
@@ -969,7 +1017,7 @@ if _acwi_variant_g == "Variant 2 (Per-Country / Solactive)":
 else:
     _em_method_g = st.session_state.get("em_method_radio", "Threshold (% des DM Grenzstocks)")
 
-tab_overview, tab_v1, tab_v2, tab_v3, tab_acwi, tab_compare, tab_acwi_compare = st.tabs([
+tab_overview, tab_v1, tab_v2, tab_v3, tab_acwi, tab_compare, tab_acwi_compare, tab_new_v1, tab_new_v2, tab_new_gimi, tab_new_compare = st.tabs([
     "🌍 Universe Overview",
     "📐 Variant 1 — Global / MSCI DM Thresholds",
     "🗺️ Variant 2 — Per-Country / Solactive DM Thresholds",
@@ -977,6 +1025,10 @@ tab_overview, tab_v1, tab_v2, tab_v3, tab_acwi, tab_compare, tab_acwi_compare = 
     "🌐 ACWI (DM + EM)",
     "⚖️ Variant Comparison (World)",
     "🔀 ACWI Comparison (V1 vs V2)",
+    "📊 Global Sort (Threshold)",
+    "🗺️ Per Country (Solactive)",
+    "⚡ GIMI Method",
+    "🔀 Varianten Vergleich",
 ])
 
 
@@ -2922,3 +2974,696 @@ with tab_acwi_compare:
             file_name="NaroIX_ACWI_V2.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHARED HELPER — New Universe Builder (Primary only + Thailand NVDR exception)
+# ══════════════════════════════════════════════════════════════════════════════
+def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
+                       excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
+                       china_if, india_if, vietnam_if, saudi_if):
+    """Build clean Primary-only universe with Thailand NVDR exception."""
+    import re as _re
+    df = df_raw_orig.copy()
+    for col in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
+                "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025","Closing Price"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    # Step 1: Thailand NVDR exception (before Primary filter)
+    _th = df["Exchange Name"].fillna("").str.upper() == "THAILAND"
+    if thailand_mode == "NVDR":
+        # Remove SHARE, keep NVDR (even though Secondary)
+        df = df[~(_th & (df["Sec Type"].fillna("") == "SHARE"))].copy()
+    else:
+        # Remove NVDR, keep SHARE
+        df = df[~(_th & (df["Sec Type"].fillna("") == "NVDR"))].copy()
+
+    # Step 2: Primary only (Thailand NVDRs already handled)
+    _th_nvdr = df["Exchange Name"].fillna("").str.upper() == "THAILAND"  # remaining Thai stocks
+    df = df[(df["Listing"].fillna("") == "Primary") | _th_nvdr].copy()
+
+    # Step 3: Exclusions
+    df = df[df["Free Float MCap Y2025"] > 0].copy()
+    if max_price:
+        df = df[df["Closing Price"].fillna(0) < max_price].copy()
+    if excl_hk_cny:
+        df = df[~(df["Exchange Ticker"].str.contains("HKG", na=False) & (df["Trading Currency"] == "CNY"))].copy()
+    if excl_cor_na:
+        df = df[df["Country of Risk"].fillna("") != "@NA"].copy()
+    if excl_naics:
+        df = df[~df["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False)].copy()
+    if excl_euro:
+        df = df[~df["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])].copy()
+    if excl_etf:
+        df = df[~df["Name"].fillna("").str.contains(_re.compile(r'\bETF\b|\bSICAV\b|%', _re.IGNORECASE))].copy()
+
+    # Step 4: Classification
+    df["Mapping Country"] = df.apply(
+        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+                  else r.get("Country of Risk",""), axis=1)
+    df["Classification"] = df["Mapping Country"].map(country_cls)
+    df = df[df["Classification"].notna()].copy()
+
+    # Step 5: Inclusion Factors
+    ecn = df["Exchange Country Name"].fillna("")
+    df["IF"] = np.where(ecn.str.upper()=="CHINA",        china_if,
+               np.where(ecn.str.upper()=="INDIA",        india_if,
+               np.where(ecn.str.upper()=="VIETNAM",      vietnam_if,
+               np.where(ecn.str.upper()=="SAUDI ARABIA", saudi_if, 1.0))))
+    df["Adj_FF_MCap"] = df["Free Float MCap Y2025"] * df["IF"]
+
+    # ADTV best for ATVR
+    df["ADTV_Best"] = df["12M ADTV Y2025"].where(df["12M ADTV Y2025"]>0,
+                      df["6M ADTV Y2025"].where(df["6M ADTV Y2025"]>0,
+                      df["3M ADTV Y2025"].where(df["3M ADTV Y2025"]>0,
+                      df["1M ADTV Y2025"])))
+    df["ATVR"] = np.where(df["Total MCap Y2025"]>0,
+                          df["ADTV_Best"]*252/df["Total MCap Y2025"], 0)
+    return df
+
+
+def apply_liquidity_new(df, adtv_dm, adtv_em, atvr_dm, atvr_em):
+    """Apply ADTV + ATVR filter."""
+    mask = ((df["Classification"]=="DM") &
+            (df["3M ADTV Y2025"]>=adtv_dm) &
+            (df["6M ADTV Y2025"]>=adtv_dm) &
+            (df["ATVR"]>=atvr_dm)) | \
+           ((df["Classification"]=="EM") &
+            (df["3M ADTV Y2025"]>=adtv_em) &
+            (df["6M ADTV Y2025"]>=adtv_em) &
+            (df["ATVR"]>=atvr_em))
+    return df[mask].copy()
+
+
+def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Country", sort_col="Adj_FF_MCap"):
+    """Assign Large/Mid/Small/Micro Cap segments per group."""
+    results = []
+    for grp_val, grp in df.groupby(group_col):
+        grp = grp.sort_values(sort_col, ascending=False).copy()
+        total = grp[sort_col].sum()
+        if total == 0:
+            grp["Segment_New"] = "Micro Cap"
+            results.append(grp)
+            continue
+        grp["_cum_pct"] = grp[sort_col].cumsum() / total * 100
+        grp["Segment_New"] = np.where(grp["_cum_pct"] <= large_pct, "Large Cap",
+                             np.where(grp["_cum_pct"] <= mid_pct,   "Mid Cap",
+                             np.where(grp["_cum_pct"] <= small_pct, "Small Cap", "Micro Cap")))
+        results.append(grp)
+    return pd.concat(results, ignore_index=True)
+
+
+def add_step8_secondary_new(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, atvr_em,
+                             max_price, thailand_mode, china_if, india_if, vietnam_if, saudi_if):
+    """Step 8: Add secondary share classes for selected entities."""
+    selected_entities = set(df_selected["Entity ID"].dropna().unique())
+    df_sec = df_raw_orig[
+        (df_raw_orig["Listing"].fillna("") == "Secondary") &
+        (df_raw_orig["Entity ID"].isin(selected_entities))
+    ].copy()
+    # Exclude Thailand NVDRs/SHAREs already handled
+    _th = df_sec["Exchange Name"].fillna("").str.upper() == "THAILAND"
+    if thailand_mode == "NVDR":
+        df_sec = df_sec[~(_th & (df_sec["Sec Type"].fillna("") == "SHARE"))].copy()
+    else:
+        df_sec = df_sec[~(_th & (df_sec["Sec Type"].fillna("") == "NVDR"))].copy()
+
+    if len(df_sec) == 0:
+        return df_selected
+
+    for col in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
+                "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025","Closing Price"]:
+        df_sec[col] = pd.to_numeric(df_sec[col], errors="coerce").fillna(0)
+
+    df_sec = df_sec[df_sec["Free Float MCap Y2025"] > 0].copy()
+    if max_price:
+        df_sec = df_sec[df_sec["Closing Price"].fillna(0) < max_price].copy()
+
+    ecn = df_sec["Exchange Country Name"].fillna("")
+    df_sec["IF"] = np.where(ecn.str.upper()=="CHINA",        china_if,
+                   np.where(ecn.str.upper()=="INDIA",        india_if,
+                   np.where(ecn.str.upper()=="VIETNAM",      vietnam_if,
+                   np.where(ecn.str.upper()=="SAUDI ARABIA", saudi_if, 1.0))))
+    df_sec["Adj_FF_MCap"] = df_sec["Free Float MCap Y2025"] * df_sec["IF"]
+    df_sec["ADTV_Best"] = df_sec["12M ADTV Y2025"].where(df_sec["12M ADTV Y2025"]>0,
+                          df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"]>0,
+                          df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"]>0,
+                          df_sec["1M ADTV Y2025"])))
+    df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"]>0,
+                              df_sec["ADTV_Best"]*252/df_sec["Total MCap Y2025"], 0)
+
+    # Remove already included symbols
+    existing_symbols = set(df_selected["Symbol"].unique())
+    df_sec = df_sec[~df_sec["Symbol"].isin(existing_symbols)].copy()
+
+    if len(df_sec) == 0:
+        return df_selected
+    return pd.concat([df_selected, df_sec], ignore_index=True)
+
+
+def render_new_tab(tab_name, df_included, large_pct, mid_pct,
+                   china_if, india_if, vietnam_if, saudi_if,
+                   params_dict):
+    """Render standard visuals for a new index tab."""
+
+    df_dm = df_included[df_included["Classification"]=="DM"].copy()
+    df_em = df_included[df_included["Classification"]=="EM"].copy()
+
+    seg_order = ["Large Cap","Mid Cap","Small Cap","Micro Cap"]
+
+    # ── Top metrics ──────────────────────────────────────────────────────────
+    total_adj = df_included["Adj_FF_MCap"].sum()
+    em_adj    = df_em["Adj_FF_MCap"].sum()
+    em_w      = em_adj/total_adj*100 if total_adj > 0 else 0
+
+    m1,m2,m3,m4,m5,m6 = st.columns(6)
+    m1.metric("Total Stocks",  f"{len(df_included):,}")
+    m2.metric("DM Stocks",     f"{len(df_dm):,}")
+    m3.metric("EM Stocks",     f"{len(df_em):,}")
+    m4.metric("DM FF MCap",    format_bn(df_dm["Free Float MCap Y2025"].sum()))
+    m5.metric("EM FF MCap",    format_bn(df_em["Free Float MCap Y2025"].sum()))
+    m6.metric("EM Adj. Weight",f"{em_w:.2f}%")
+
+    # ── 5 Index Products ─────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**Index-Produkte**")
+    _world_dm  = df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _world_em  = df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _imi_dm_s  = df_dm[df_dm["Segment_New"]=="Small Cap"]
+    _imi_em_s  = df_em[df_em["Segment_New"]=="Small Cap"]
+
+    _idx_rows = [
+        {"Index": "🌍 World Index",  "DM": len(_world_dm), "EM": "—", "Total": len(_world_dm),
+         "DM FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()),
+         "Adj. Weight DM": f"{_world_dm['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—"},
+        {"Index": "🌏 EM Index",     "DM": "—", "EM": len(_world_em), "Total": len(_world_em),
+         "DM FF MCap": "—",
+         "Adj. Weight DM": f"{_world_em['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—"},
+        {"Index": "🌐 ACWI Index",   "DM": len(_world_dm), "EM": len(_world_em), "Total": len(_world_dm)+len(_world_em),
+         "DM FF MCap": format_bn((_world_dm["Free Float MCap Y2025"].sum()+_world_em["Free Float MCap Y2025"].sum())),
+         "Adj. Weight DM": "100.00%"},
+        {"Index": "🌍+ World IMI",   "DM": len(_world_dm)+len(_imi_dm_s), "EM": "—", "Total": len(_world_dm)+len(_imi_dm_s),
+         "DM FF MCap": format_bn((_world_dm["Free Float MCap Y2025"].sum()+_imi_dm_s["Free Float MCap Y2025"].sum())),
+         "Adj. Weight DM": "—"},
+        {"Index": "🌐+ ACWI IMI",    "DM": len(_world_dm)+len(_imi_dm_s), "EM": len(_world_em)+len(_imi_em_s),
+         "Total": len(_world_dm)+len(_imi_dm_s)+len(_world_em)+len(_imi_em_s),
+         "DM FF MCap": "—", "Adj. Weight DM": "—"},
+    ]
+    st.dataframe(pd.DataFrame(_idx_rows), use_container_width=True, hide_index=True)
+
+    # ── Segment Tables ────────────────────────────────────────────────────────
+    st.markdown("---")
+    _sc1, _sc2 = st.columns(2)
+
+    def seg_table(df_cls, label):
+        rows = []
+        total_ff = df_cls["Free Float MCap Y2025"].sum()
+        total_adj_cls = df_cls["Adj_FF_MCap"].sum()
+        for seg in seg_order:
+            s = df_cls[df_cls["Segment_New"]==seg]
+            rows.append({
+                "Segment": seg,
+                "Stocks": len(s),
+                "FF MCap": format_bn(s["Free Float MCap Y2025"].sum()) if len(s)>0 else "—",
+                "Adj. FF MCap": format_bn(s["Adj_FF_MCap"].sum()) if len(s)>0 else "—",
+                "Weight %": f"{s['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 and len(s)>0 else "—",
+            })
+        # Standard Index subtotal
+        std = df_cls[df_cls["Segment_New"].isin(["Large Cap","Mid Cap"])]
+        rows.insert(2, {
+            "Segment": f"── {label} Index (Large+Mid)",
+            "Stocks": len(std),
+            "FF MCap": format_bn(std["Free Float MCap Y2025"].sum()),
+            "Adj. FF MCap": format_bn(std["Adj_FF_MCap"].sum()),
+            "Weight %": f"{std['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—",
+        })
+        return pd.DataFrame(rows)
+
+    with _sc1:
+        st.markdown("**DM Segmente**")
+        _dm_seg = seg_table(df_dm, "World")
+        def _style_dm_seg(df):
+            def rs(row):
+                if "World Index" in row["Segment"]: return ["background-color:#1a3a5c;font-weight:700;"]*len(row)
+                return [""]*len(row)
+            return df.style.apply(rs, axis=1)
+        st.dataframe(_style_dm_seg(_dm_seg), use_container_width=True, hide_index=True)
+
+    with _sc2:
+        st.markdown("**EM Segmente**")
+        _em_seg = seg_table(df_em, "EM")
+        def _style_em_seg(df):
+            def rs(row):
+                if "EM Index" in row["Segment"]: return ["background-color:#1a2a1a;font-weight:700;"]*len(row)
+                return [""]*len(row)
+            return df.style.apply(rs, axis=1)
+        st.dataframe(_style_em_seg(_em_seg), use_container_width=True, hide_index=True)
+
+    # ── Country Breakdown ─────────────────────────────────────────────────────
+    st.markdown("---")
+    _cc1, _cc2 = st.columns(2)
+
+    def country_table(df_cls):
+        ct = df_cls.groupby("Mapping Country").agg(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Adj_MCap=("Adj_FF_MCap","sum"),
+            Avg_MCap=("Total MCap Y2025","mean"),
+        ).reset_index().sort_values("Adj_MCap", ascending=False)
+        ct["FF MCap"] = ct["FF_MCap"].apply(format_bn)
+        ct["Avg MCap"] = ct["Avg_MCap"].apply(format_bn)
+        ct["Weight %"] = (ct["Adj_MCap"]/total_adj*100).round(2)
+        return ct[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"})
+
+    with _cc1:
+        st.markdown(f"**DM Country Breakdown ({len(df_dm):,} Stocks)**")
+        st.dataframe(country_table(df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]),
+                     use_container_width=True, hide_index=True)
+    with _cc2:
+        st.markdown(f"**EM Country Breakdown ({len(df_em):,} Stocks)**")
+        st.dataframe(country_table(df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]),
+                     use_container_width=True, hide_index=True)
+
+    # ── Country Charts ────────────────────────────────────────────────────────
+    st.markdown("---")
+    _acwi_std = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
+    _by_w = _acwi_std.groupby("Mapping Country").agg(
+        Stocks=("Symbol","count"), Adj=("Adj_FF_MCap","sum")).reset_index()
+    _by_w["Weight%"] = (_by_w["Adj"]/_acwi_std["Adj_FF_MCap"].sum()*100).round(2)
+    _by_w = _by_w.sort_values("Adj", ascending=False)
+    _top30 = _by_w.head(30)
+    _rest  = _by_w.iloc[30:]
+    if len(_rest):
+        _top30 = pd.concat([pd.DataFrame([{"Mapping Country":f"Others ({len(_rest)})", "Stocks":_rest["Stocks"].sum(), "Adj":_rest["Adj"].sum(), "Weight%":_rest["Weight%"].sum()}]), _top30])
+    _top30 = _top30.sort_values("Adj", ascending=True)
+
+    _ch1, _ch2 = st.columns(2)
+    with _ch1:
+        st.markdown("**Nach Anzahl Stocks (%)**")
+        _by_s2 = _acwi_std.groupby("Mapping Country").agg(Stocks=("Symbol","count")).reset_index()
+        _by_s2["Pct"] = (_by_s2["Stocks"]/len(_acwi_std)*100).round(2)
+        _by_s2 = _by_s2.sort_values("Stocks", ascending=False)
+        _top30s = _by_s2.head(30)
+        _rests  = _by_s2.iloc[30:]
+        if len(_rests):
+            _top30s = pd.concat([pd.DataFrame([{"Mapping Country":f"Others ({len(_rests)})", "Stocks":_rests["Stocks"].sum(), "Pct":_rests["Pct"].sum()}]), _top30s])
+        _top30s = _top30s.sort_values("Stocks", ascending=True)
+        fig_s = go.Figure(go.Bar(x=_top30s["Pct"], y=_top30s["Mapping Country"],
+            orientation="h", marker_color="#2979ff",
+            text=_top30s["Pct"].apply(lambda x: f"{x:.2f}%"), textposition="outside"))
+        fig_s.update_layout(template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60), xaxis=dict(showgrid=False))
+        st.plotly_chart(fig_s, use_container_width=True)
+
+    with _ch2:
+        st.markdown("**Nach Gewicht (Adj. FF MCap %)**")
+        fig_w = go.Figure(go.Bar(x=_top30["Weight%"], y=_top30["Mapping Country"],
+            orientation="h", marker_color="#ce93d8",
+            text=_top30["Weight%"].apply(lambda x: f"{x:.2f}%"), textposition="outside"))
+        fig_w.update_layout(template="plotly_dark", paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+            height=700, margin=dict(t=10,b=10,l=10,r=60), xaxis=dict(showgrid=False))
+        st.plotly_chart(fig_w, use_container_width=True)
+
+    # ── Donut + IF Impact ────────────────────────────────────────────────────
+    st.markdown("---")
+    _d1, _d2 = st.columns([1,1])
+    with _d1:
+        st.markdown("**ACWI Composition (DM vs EM)**")
+        _donut = pd.DataFrame([
+            {"Label":"DM","FF MCap":df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]["Adj_FF_MCap"].sum()},
+            {"Label":"EM","FF MCap":df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]["Adj_FF_MCap"].sum()},
+        ])
+        fig_d = px.pie(_donut, names="Label", values="FF MCap",
+            color="Label", color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"},
+            template="plotly_dark", hole=0.45)
+        fig_d.update_layout(paper_bgcolor="#0f1117", height=350, margin=dict(t=10,b=10))
+        st.plotly_chart(fig_d, use_container_width=True)
+
+    with _d2:
+        st.markdown("**Inclusion Factor Impact**")
+        _if_entries = [
+            ("China A-Shares (IF 20%)",
+             df_included["Exchange Country Name"].fillna("").str.upper()=="CHINA", china_if),
+            ("China H-Shares / Red Chips (IF 100%)",
+             (df_included["Mapping Country"].fillna("").str.upper()=="CHINA") &
+             (df_included["Exchange Country Name"].fillna("").str.upper()!="CHINA"), 1.0),
+            ("Indien", df_included["Exchange Country Name"].fillna("").str.upper()=="INDIA", india_if),
+            ("Vietnam", df_included["Exchange Country Name"].fillna("").str.upper()=="VIETNAM", vietnam_if),
+            ("Saudi-Arabien", df_included["Exchange Country Name"].fillna("").str.upper()=="SAUDI ARABIA", saudi_if),
+        ]
+        _if_rows = []
+        _tot_ff = df_included["Free Float MCap Y2025"].sum()
+        _tot_adj2 = df_included["Adj_FF_MCap"].sum()
+        for _nm, _msk, _fac in _if_entries:
+            _ff = df_included.loc[_msk,"Free Float MCap Y2025"].sum()
+            _adj = df_included.loc[_msk,"Adj_FF_MCap"].sum()
+            if _ff > 0:
+                _if_rows.append({"Land":_nm,"Factor":f"{_fac*100:.0f}%",
+                    "Weight (vor)": round(_ff/_tot_ff*100,4) if _tot_ff>0 else 0,
+                    "Weight (nach)": round(_adj/_tot_adj2*100,4) if _tot_adj2>0 else 0,
+                    "Δ": round(_adj/_tot_adj2*100-_ff/_tot_ff*100,4) if _tot_ff>0 and _tot_adj2>0 else 0})
+        if _if_rows:
+            _if_df = pd.DataFrame(_if_rows)
+            _if_df = pd.concat([_if_df, pd.DataFrame([{
+                "Land":"Total","Factor":"—",
+                "Weight (vor)": round(_if_df["Weight (vor)"].sum(),4),
+                "Weight (nach)": round(_if_df["Weight (nach)"].sum(),4),
+                "Δ": round(_if_df["Δ"].sum(),4)}])], ignore_index=True)
+            def _sif(df):
+                def rs(row):
+                    if row["Land"]=="Total": return ["background-color:#1a2a4a;font-weight:600;"]*len(row)
+                    return [""]*len(row)
+                return df.style.apply(rs, axis=1)
+            st.dataframe(_sif(_if_df), use_container_width=True, hide_index=True)
+
+    # ── Download ──────────────────────────────────────────────────────────────
+    st.markdown("---")
+    _drop = ["_cum_pct","ADTV_Best","ATVR"]
+    _world_dl = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap","Micro Cap"])].copy()
+    _acwi_dl  = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
+    _params_dl = pd.DataFrame([{"Parameter":k,"Wert":v} for k,v in params_dict.items()])
+
+    st.download_button(
+        f"⬇️ Download {tab_name} als Excel",
+        data=to_excel_multi({
+            "Universe":         df_included[[c for c in df_included.columns if c not in _drop]],
+            "World Index (DM)": df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])][[c for c in df_included.columns if c not in _drop]],
+            "EM Index":         df_included[(df_included["Classification"]=="EM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])][[c for c in df_included.columns if c not in _drop]],
+            "ACWI Index":       _acwi_dl[[c for c in _acwi_dl.columns if c not in _drop]],
+            "World IMI":        df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])][[c for c in df_included.columns if c not in _drop]],
+            "ACWI IMI":         df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])][[c for c in df_included.columns if c not in _drop]],
+            "Parameter Settings": _params_dl,
+        }),
+        file_name=f"NaroIX_{tab_name.replace(' ','_')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 7: Global Sort (Threshold)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_new_v1:
+    if not uploaded:
+        st.info("👆 Bitte eine Excel-Datei hochladen.")
+    else:
+        st.markdown("## 📊 Global Sort (Threshold)")
+        st.caption("Primary only + Secondary Schritt 8 | Post-Liquiditätsfilter | Globale Sortierung nach Total MCap")
+
+        _nu = build_new_universe(
+            df_raw_original, country_cls,
+            _new_thai, new_max_price,
+            exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds,
+            exclude_euro_mtf, exclude_etf_sicav,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor)
+
+        # Post-Liquidity filter
+        _nu_liq = apply_liquidity_new(_nu, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
+
+        # Global sort by Total MCap, cumulate FF MCap → segments
+        _nu_sorted = _nu_liq.sort_values("Total MCap Y2025", ascending=False).copy()
+        _total_ff_g = _nu_sorted["Free Float MCap Y2025"].sum()
+        _nu_sorted["_cum_pct"] = _nu_sorted["Free Float MCap Y2025"].cumsum() / _total_ff_g * 100 if _total_ff_g > 0 else 0
+        _nu_sorted["Segment_New"] = np.where(_nu_sorted["_cum_pct"] <= large_thr, "Large Cap",
+                                    np.where(_nu_sorted["_cum_pct"] <= mid_thr,   "Mid Cap",
+                                    np.where(_nu_sorted["_cum_pct"] <= small_thr, "Small Cap", "Micro Cap")))
+
+        # Step 8: Secondary Share Classes
+        _nu_final = add_step8_secondary_new(
+            _nu_sorted, df_raw_original, new_adtv_dm, new_adtv_em,
+            new_atvr_dm, new_atvr_em, new_max_price, _new_thai,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor)
+
+        # Weight
+        _tot_adj_nv1 = _nu_final["Adj_FF_MCap"].sum()
+        _nu_final["Index_Weight"] = (_nu_final["Adj_FF_MCap"]/_tot_adj_nv1*100) if _tot_adj_nv1>0 else 0
+
+        _params_nv1 = {
+            "Methodik": "Global Sort (Threshold)",
+            "Listing": "Primary only + Secondary Schritt 8",
+            "Liquidität": "Post-Filter",
+            "Large Cap (%)": large_thr,
+            "Mid Cap (%)": mid_thr,
+            "Small Cap (%)": small_thr,
+            "DM ADTV (USD)": f"{new_adtv_dm:,.0f}",
+            "EM ADTV (USD)": f"{new_adtv_em:,.0f}",
+            "DM ATVR (%)": f"{new_atvr_dm*100:.0f}%",
+            "EM ATVR (%)": f"{new_atvr_em*100:.0f}%",
+            "Max Closing Price (USD)": f"{new_max_price:,.0f}",
+        }
+        render_new_tab("Global Sort", _nu_final, large_thr, mid_thr,
+                       china_inclusion_factor, india_inclusion_factor,
+                       vietnam_inclusion_factor, saudi_inclusion_factor,
+                       _params_nv1)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 8: Per Country (Solactive)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_new_v2:
+    if not uploaded:
+        st.info("👆 Bitte eine Excel-Datei hochladen.")
+    else:
+        st.markdown("## 🗺️ Per Country (Solactive)")
+        st.caption("Primary only + Secondary Schritt 8 | Post-Liquiditätsfilter | Sortierung per Mapping Country")
+
+        _nu2 = build_new_universe(
+            df_raw_original, country_cls,
+            _new_thai, new_max_price,
+            exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds,
+            exclude_euro_mtf, exclude_etf_sicav,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor)
+
+        # Post-Liquidity filter
+        _nu2_liq = apply_liquidity_new(_nu2, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
+
+        # Per country segments
+        _nu2_seg = assign_segments_new(_nu2_liq, large_thr, mid_thr, small_thr,
+                                        group_col="Mapping Country", sort_col="Adj_FF_MCap")
+
+        # Step 8: Secondary Share Classes
+        _nu2_final = add_step8_secondary_new(
+            _nu2_seg, df_raw_original, new_adtv_dm, new_adtv_em,
+            new_atvr_dm, new_atvr_em, new_max_price, _new_thai,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor)
+
+        _tot_adj_nv2 = _nu2_final["Adj_FF_MCap"].sum()
+        _nu2_final["Index_Weight"] = (_nu2_final["Adj_FF_MCap"]/_tot_adj_nv2*100) if _tot_adj_nv2>0 else 0
+
+        _params_nv2 = {
+            "Methodik": "Per Country (Solactive)",
+            "Listing": "Primary only + Secondary Schritt 8",
+            "Liquidität": "Post-Filter",
+            "Large Cap (%)": large_thr,
+            "Mid Cap (%)": mid_thr,
+            "Small Cap (%)": small_thr,
+            "DM ADTV (USD)": f"{new_adtv_dm:,.0f}",
+            "EM ADTV (USD)": f"{new_adtv_em:,.0f}",
+            "DM ATVR (%)": f"{new_atvr_dm*100:.0f}%",
+            "EM ATVR (%)": f"{new_atvr_em*100:.0f}%",
+            "Max Closing Price (USD)": f"{new_max_price:,.0f}",
+        }
+        render_new_tab("Per Country (Solactive)", _nu2_final, large_thr, mid_thr,
+                       china_inclusion_factor, india_inclusion_factor,
+                       vietnam_inclusion_factor, saudi_inclusion_factor,
+                       _params_nv2)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 9: GIMI Method
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_new_gimi:
+    if not uploaded:
+        st.info("👆 Bitte eine Excel-Datei hochladen.")
+    else:
+        st.markdown("## ⚡ GIMI Method")
+        st.caption("Primary only + Secondary Schritt 8 | EUMSS Pre-Filter | Liquidität Pre-Filter | 85% Coverage per Land auf Adj_FF_MCap")
+
+        _nu3 = build_new_universe(
+            df_raw_original, country_cls,
+            _new_thai, new_max_price,
+            exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds,
+            exclude_euro_mtf, exclude_etf_sicav,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor)
+
+        # EUMSS Kalibrierung auf DM (small_thr = 99%)
+        _g_dm_all = _nu3[_nu3["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
+        _g_tot_ff = _g_dm_all["Free Float MCap Y2025"].sum()
+        _g_dm_all["_cp"] = _g_dm_all["Free Float MCap Y2025"].cumsum() / _g_tot_ff * 100 if _g_tot_ff>0 else 0
+        _g_eumss_row = _g_dm_all[_g_dm_all["_cp"] >= small_thr]
+        if len(_g_eumss_row) == 0:
+            st.error("EUMSS konnte nicht kalibriert werden — keine DM Stocks gefunden.")
+        else:
+            _g_eumss_full = _g_eumss_row.iloc[0]["Total MCap Y2025"]
+            _g_eumss_ff   = _g_eumss_full * new_eumss_ff_ratio
+            _g_min_ff_pct = large_thr / 100  # use large_thr as min FF% proxy? No — use 15% fixed
+            _g_min_ff_pct = 0.15
+
+            # EUMSS Filter
+            _g_mask_eumss = (
+                (_nu3["Total MCap Y2025"] >= _g_eumss_full) &
+                (_nu3["Free Float MCap Y2025"] >= _g_eumss_ff) &
+                (_nu3["Free Float Percent"] >= _g_min_ff_pct))
+            _nu3_eumss = _nu3[_g_mask_eumss].copy()
+
+            # Pre-Liquidity filter
+            _nu3_liq = apply_liquidity_new(_nu3_eumss, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
+
+            # 85% Coverage per Mapping Country on Adj_FF_MCap → Standard Index
+            _g_results = []
+            for _ctry, _grp in _nu3_liq.groupby("Mapping Country"):
+                _grp = _grp.sort_values("Adj_FF_MCap", ascending=False).copy()
+                _tot = _grp["Adj_FF_MCap"].sum()
+                if _tot == 0: continue
+                _grp["_c"] = _grp["Adj_FF_MCap"].cumsum() / _tot * 100
+                _cut = _grp[_grp["_c"] >= mid_thr].index
+                _included = _grp.loc[:_cut[0]] if len(_cut)>0 else _grp
+                # Assign Large/Mid within included
+                _tot_inc = _included["Adj_FF_MCap"].sum()
+                _included = _included.copy()
+                _included["_cp2"] = _included["Adj_FF_MCap"].cumsum() / _tot_inc * 100 if _tot_inc>0 else 0
+                _included["Segment_New"] = np.where(_included["_cp2"] <= large_thr, "Large Cap", "Mid Cap")
+                _g_results.append(_included)
+
+            if _g_results:
+                _nu3_std = pd.concat(_g_results, ignore_index=True)
+            else:
+                _nu3_std = pd.DataFrame(columns=_nu3_liq.columns.tolist()+["Segment_New"])
+
+            # EUMSS stocks not in standard index → Small Cap (85-99%)
+            _nu3_small = _nu3_eumss[~_nu3_eumss.index.isin(_nu3_liq.index)].copy()
+            _nu3_small["Segment_New"] = "Small Cap"
+
+            # Below EUMSS → Micro Cap
+            _nu3_micro = _nu3[~_nu3.index.isin(_nu3_eumss.index)].copy()
+            _nu3_micro["Segment_New"] = "Micro Cap"
+
+            _nu3_all = pd.concat([_nu3_std, _nu3_small, _nu3_micro], ignore_index=True)
+
+            # Step 8: Secondary Share Classes (only for Standard Index)
+            _nu3_final = add_step8_secondary_new(
+                _nu3_std, df_raw_original, new_adtv_dm, new_adtv_em,
+                new_atvr_dm, new_atvr_em, new_max_price, _new_thai,
+                china_inclusion_factor, india_inclusion_factor,
+                vietnam_inclusion_factor, saudi_inclusion_factor)
+            # Add Small + Micro back
+            _nu3_complete = pd.concat([_nu3_final, _nu3_small, _nu3_micro], ignore_index=True)
+
+            _tot_adj_nv3 = _nu3_complete["Adj_FF_MCap"].sum()
+            _nu3_complete["Index_Weight"] = (_nu3_complete["Adj_FF_MCap"]/_tot_adj_nv3*100) if _tot_adj_nv3>0 else 0
+
+            # Pipeline Diagnostik
+            with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+                _g_diag = [
+                    {"Schritt": "1 — Universe (Primary only)", "DM": (_nu3["Classification"]=="DM").sum(), "EM": (_nu3["Classification"]=="EM").sum(), "Total": len(_nu3)},
+                    {"Schritt": f"2 — EUMSS Filter ({_g_eumss_full/1e6:.0f}M)", "DM": (_nu3_eumss["Classification"]=="DM").sum(), "EM": (_nu3_eumss["Classification"]=="EM").sum(), "Total": len(_nu3_eumss), "Exkl.": f"-{len(_nu3)-len(_nu3_eumss):,}"},
+                    {"Schritt": "3 — Liquidität (Pre)", "DM": (_nu3_liq["Classification"]=="DM").sum(), "EM": (_nu3_liq["Classification"]=="EM").sum(), "Total": len(_nu3_liq), "Exkl.": f"-{len(_nu3_eumss)-len(_nu3_liq):,}"},
+                    {"Schritt": f"4 — {mid_thr}% Coverage (Standard)", "DM": (_nu3_std["Classification"]=="DM").sum(), "EM": (_nu3_std["Classification"]=="EM").sum(), "Total": len(_nu3_std), "Exkl.": f"-{len(_nu3_liq)-len(_nu3_std):,}"},
+                    {"Schritt": "5 — Secondary Schritt 8 (+)", "DM": (_nu3_final["Classification"]=="DM").sum(), "EM": (_nu3_final["Classification"]=="EM").sum(), "Total": len(_nu3_final), "Exkl.": f"+{len(_nu3_final)-len(_nu3_std):,}"},
+                ]
+                st.dataframe(pd.DataFrame(_g_diag), use_container_width=True, hide_index=True)
+                st.caption(f"EUMSS_FULL: {format_bn(_g_eumss_full)} | EUMSS_FF: {format_bn(_g_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}%")
+
+            _params_nv3 = {
+                "Methodik": "GIMI Method",
+                "Listing": "Primary only + Secondary Schritt 8",
+                "Liquidität": "Pre-Filter (nach EUMSS)",
+                f"EUMSS Kalibrierung (%)": f"{small_thr}%",
+                "EUMSS_FULL (USD)": format_bn(_g_eumss_full),
+                "EUMSS FF Ratio (%)": f"{new_eumss_ff_ratio*100:.0f}%",
+                "EUMSS_FF (USD)": format_bn(_g_eumss_ff),
+                "Min FF%": "15%",
+                "Coverage (%)": f"{mid_thr}%",
+                "Coverage Basis": "Adj_FF_MCap",
+                "Large Cap (%)": large_thr,
+                "DM ADTV (USD)": f"{new_adtv_dm:,.0f}",
+                "EM ADTV (USD)": f"{new_adtv_em:,.0f}",
+                "DM ATVR (%)": f"{new_atvr_dm*100:.0f}%",
+                "EM ATVR (%)": f"{new_atvr_em*100:.0f}%",
+                "Max Closing Price (USD)": f"{new_max_price:,.0f}",
+            }
+            render_new_tab("GIMI Method", _nu3_complete, large_thr, mid_thr,
+                           china_inclusion_factor, india_inclusion_factor,
+                           vietnam_inclusion_factor, saudi_inclusion_factor,
+                           _params_nv3)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 10: Varianten Vergleich
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_new_compare:
+    if not uploaded:
+        st.info("👆 Bitte eine Excel-Datei hochladen.")
+    else:
+        st.markdown("## 🔀 Varianten Vergleich — Global Sort vs. Per Country vs. GIMI")
+        st.caption("Vergleich der drei Methoden für alle 5 Index-Produkte")
+
+        try:
+            # Collect results from all three tabs
+            def _idx_stats(df, name):
+                std = df[df["Segment_New"].isin(["Large Cap","Mid Cap"])]
+                dm_std = std[std["Classification"]=="DM"]
+                em_std = std[std["Classification"]=="EM"]
+                dm_imi = df[(df["Classification"]=="DM") & df["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+                em_imi = df[(df["Classification"]=="EM") & df["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+                acwi_imi = df[df["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+                tot_adj = std["Adj_FF_MCap"].sum()
+                em_w = em_std["Adj_FF_MCap"].sum()/tot_adj*100 if tot_adj>0 else 0
+                india = std[std["Exchange Country Name"].fillna("").str.upper()=="INDIA"]
+                india_em_w = india["Adj_FF_MCap"].sum()/em_std["Adj_FF_MCap"].sum()*100 if em_std["Adj_FF_MCap"].sum()>0 else 0
+                return {
+                    "Methodik": name,
+                    "World Index (DM L+M)": len(dm_std),
+                    "EM Index (EM L+M)": len(em_std),
+                    "ACWI (DM+EM L+M)": len(std),
+                    "World IMI": len(dm_imi),
+                    "ACWI IMI": len(acwi_imi),
+                    "EM Weight %": f"{em_w:.2f}%",
+                    "Indien Stocks": len(india),
+                    "Indien EM %": f"{india_em_w:.2f}%",
+                }
+
+            _cmp_rows = [
+                _idx_stats(_nu_final, "Global Sort (Threshold)"),
+                _idx_stats(_nu2_final, "Per Country (Solactive)"),
+                _idx_stats(_nu3_complete, "GIMI Method"),
+            ]
+            _cmp_df = pd.DataFrame(_cmp_rows)
+
+            def _style_cmp(df):
+                return df.style.set_properties(**{"text-align":"center"})
+            st.dataframe(_style_cmp(_cmp_df), use_container_width=True, hide_index=True)
+
+            # Country weight comparison chart
+            st.markdown("---")
+            st.markdown("**Top 15 Länder — ACWI Gewicht % im Vergleich**")
+
+            def _ctry_weights(df, name):
+                std = df[df["Segment_New"].isin(["Large Cap","Mid Cap"])]
+                tot = std["Adj_FF_MCap"].sum()
+                ct = std.groupby("Mapping Country")["Adj_FF_MCap"].sum().reset_index()
+                ct["Weight%"] = ct["Adj_FF_MCap"]/tot*100 if tot>0 else 0
+                ct["Methodik"] = name
+                return ct
+
+            _all_ct = pd.concat([
+                _ctry_weights(_nu_final, "Global Sort"),
+                _ctry_weights(_nu2_final, "Per Country"),
+                _ctry_weights(_nu3_complete, "GIMI"),
+            ])
+            _top15_countries = _all_ct.groupby("Mapping Country")["Adj_FF_MCap"].sum().nlargest(15).index.tolist()
+            _all_ct_top = _all_ct[_all_ct["Mapping Country"].isin(_top15_countries)]
+
+            fig_cmp = px.bar(_all_ct_top, x="Mapping Country", y="Weight%", color="Methodik",
+                barmode="group", template="plotly_dark",
+                color_discrete_map={"Global Sort":"#2979ff","Per Country":"#66bb6a","GIMI":"#ce93d8"})
+            fig_cmp.update_layout(paper_bgcolor="#0f1117", plot_bgcolor="#161b27",
+                height=450, margin=dict(t=10,b=10))
+            st.plotly_chart(fig_cmp, use_container_width=True)
+
+        except NameError:
+            st.warning("⚠️ Bitte zuerst Tab 7, Tab 8 und Tab 9 aufrufen damit alle drei Varianten berechnet werden.")
