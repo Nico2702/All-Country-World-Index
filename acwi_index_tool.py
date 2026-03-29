@@ -207,21 +207,22 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
 
 
 def apply_step7_coverage(df_candidates, coverage_pct=0.85, country_col="Mapping Country"):
-    """Step 7: 85% coverage per country based on Adj_FF_MCap.
+    """Step 7: 85% coverage per country based on raw Free Float MCap.
+    Inclusion Factor is NOT used here — only for final weighting in Step 9.
     Returns subset of df that passes coverage threshold per country.
     """
     results = []
     country_col = country_col if country_col in df_candidates.columns else "Exchange Country Name"
     for country, grp in df_candidates.groupby(country_col):
-        grp = grp.sort_values("Adj_FF_MCap", ascending=False).copy()
-        total_adj = grp["Adj_FF_MCap"].sum()
-        if total_adj == 0:
+        grp = grp.sort_values("Free Float MCap Y2025", ascending=False).copy()
+        total_ff = grp["Free Float MCap Y2025"].sum()
+        if total_ff == 0:
             continue
-        grp["_cum_adj"] = grp["Adj_FF_MCap"].cumsum()
-        grp["_cum_adj_pct"] = grp["_cum_adj"] / total_adj * 100
+        grp["_cum_ff"] = grp["Free Float MCap Y2025"].cumsum()
+        grp["_cum_ff_pct"] = grp["_cum_ff"] / total_ff * 100
         target = coverage_pct * 100
         # Find cutoff index — include the stock that crosses the threshold
-        cutoff_idx = grp[grp["_cum_adj_pct"] >= target].index
+        cutoff_idx = grp[grp["_cum_ff_pct"] >= target].index
         if len(cutoff_idx) == 0:
             results.append(grp)
         else:
@@ -661,17 +662,17 @@ with st.sidebar:
         st.markdown("**ADTV (Schritt 4) — immer aktiv**")
         _v3u, _v3v = st.columns([3, 4])
         with _v3u: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM 3M & 6M (USD)</div>", unsafe_allow_html=True)
-        with _v3v: _v3_adtv_dm = st.text_input("DM ADTV", value="2000000", key="v3_adtv_dm", label_visibility="collapsed")
+        with _v3v: _v3_adtv_dm = st.text_input("DM ADTV", value="1500000", key="v3_adtv_dm_v2", label_visibility="collapsed")
         _v3w, _v3x = st.columns([3, 4])
         with _v3w: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM 3M & 6M (USD)</div>", unsafe_allow_html=True)
-        with _v3x: _v3_adtv_em = st.text_input("EM ADTV", value="1000000", key="v3_adtv_em", label_visibility="collapsed")
+        with _v3x: _v3_adtv_em = st.text_input("EM ADTV", value="750000", key="v3_adtv_em_v2", label_visibility="collapsed")
         st.markdown("**ATVR (Schritt 4)**")
         _v3q, _v3r = st.columns([3, 4])
         with _v3q: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM Min. (%)</div>", unsafe_allow_html=True)
-        with _v3r: _v3_atvr_dm = st.text_input("DM ATVR", value="20", key="v3_atvr_dm", label_visibility="collapsed")
+        with _v3r: _v3_atvr_dm = st.text_input("DM ATVR", value="0", key="v3_atvr_dm_v2", label_visibility="collapsed")
         _v3s, _v3t = st.columns([3, 4])
         with _v3s: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min. (%)</div>", unsafe_allow_html=True)
-        with _v3t: _v3_atvr_em = st.text_input("EM ATVR", value="15", key="v3_atvr_em", label_visibility="collapsed")
+        with _v3t: _v3_atvr_em = st.text_input("EM ATVR", value="0", key="v3_atvr_em_v2", label_visibility="collapsed")
         st.markdown("**Schritt 8**")
         include_secondary = st.checkbox("Secondary Share Classes einschließen", value=True, key="v3_secondary",
             help="Schritt 8: Secondary Listings mit gleicher Entity ID ergänzen.")
