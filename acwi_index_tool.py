@@ -1907,11 +1907,38 @@ with tab_v3:
             st.dataframe(_style_v3_if(_v3_if_df), use_container_width=True, hide_index=True)
 
     # Download
-    _v3_universe = _df_v3.copy()
-    _v3_universe = _v3_universe[[c for c in _v3_universe.columns if c not in ["cum_ff","EUMSS_Pass"]]]
+    _drop_cols = ["cum_ff", "_cum_adj", "_cum_adj_pct", "_cum_ff", "_cum_ff_pct", "_cum", "_cum_pct",
+                  "_adtv_best", "EUMSS_Pass", "ADTV_Pass", "ATVR_Pass"]
+
+    # Tab 1: Universe V3 - EUMSS (all stocks that passed EUMSS, before liquidity)
+    _v3_eumss_tab = _df_v3[_df_v3["EUMSS_Pass"]].copy()
+    _v3_eumss_tab = _v3_eumss_tab[[c for c in _v3_eumss_tab.columns if c not in _drop_cols]]
+
+    # Tab 2: Universe V3 - Liquidity (after EUMSS + ADTV + ATVR, before 85% Coverage)
+    _v3_liq_tab = _df_v3[_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"]].copy()
+    _v3_liq_tab = _v3_liq_tab[[c for c in _v3_liq_tab.columns if c not in _drop_cols]]
+
+    # Tab 3: DM only (final index)
+    _v3_dm_tab = _df_v3_included[_df_v3_included["Classification"] == "DM"].copy()
+    _v3_dm_tab = _v3_dm_tab[[c for c in _v3_dm_tab.columns if c not in _drop_cols]]
+
+    # Tab 4: EM only (final index)
+    _v3_em_tab = _df_v3_included[_df_v3_included["Classification"] == "EM"].copy()
+    _v3_em_tab = _v3_em_tab[[c for c in _v3_em_tab.columns if c not in _drop_cols]]
+
+    # Tab 5: ACWI (full final index)
+    _v3_acwi_tab = _df_v3_included.copy()
+    _v3_acwi_tab = _v3_acwi_tab[[c for c in _v3_acwi_tab.columns if c not in _drop_cols]]
+
     st.download_button(
         "⬇️ Download Variant 3 as Excel",
-        data=to_excel_multi({"Universe V3": _v3_universe, "Included": _df_v3_included}),
+        data=to_excel_multi({
+            "Universe V3 - EUMSS":      _v3_eumss_tab,
+            "Universe V3 - Liquidity":  _v3_liq_tab,
+            "DM":                       _v3_dm_tab,
+            "EM":                       _v3_em_tab,
+            "ACWI":                     _v3_acwi_tab,
+        }),
         file_name="NaroIX_Variant3_Dynamic.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
