@@ -1807,6 +1807,108 @@ with tab_v3:
         st.dataframe(_v3_em_ctry_full[[_map_col_v3,"Stocks","FF MCap (USD)","Avg Total MCap","Weight (%)"]].rename(
             columns={_map_col_v3:"Land"}), use_container_width=True, hide_index=True)
 
+    # ── Liquidity Matrix ─────────────────────────────────────────────────────
+    st.markdown("---")
+    with st.expander("📊 Liquidity Parameter Matrix — Sensitivitätsanalyse", expanded=False):
+        st.caption("Zeigt DM Stocks, EM Stocks und ACWI Total für verschiedene Kombinationen von FF%, ADTV und ATVR. Primary only, 85% Coverage auf Adj. FF MCap, Inclusion Factors China 20% / Indien 75% / Vietnam 50% / Saudi 50%.")
+
+        @st.cache_data(show_spinner=False)
+        def _compute_matrix(data_hash):
+            import re as _re3
+            _dfm = df_raw_original.copy()
+            for _c in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
+                       "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025"]:
+                _dfm[_c] = pd.to_numeric(_dfm[_c], errors="coerce").fillna(0)
+            _dfm = _dfm[_dfm["Free Float MCap Y2025"] > 0].copy()
+            _dfm = _dfm[_dfm["Listing"].fillna("") == "Primary"].copy()
+            _dfm = _dfm[~(_dfm["Exchange Ticker"].str.contains("HKG", na=False) & (_dfm["Trading Currency"] == "CNY"))].copy()
+            _dfm = _dfm[_dfm["Country of Risk"].fillna("") != "@NA"].copy()
+            _dfm = _dfm[~_dfm["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False)].copy()
+            _dfm = _dfm[~_dfm["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])].copy()
+            _dfm = _dfm[~_dfm["Name"].fillna("").str.contains(_re3.compile(r'ETF|SICAV', _re3.IGNORECASE))].copy()
+            _dfm = _dfm[~((_dfm["Exchange Name"].fillna("").str.upper() == "THAILAND") & (_dfm["Sec Type"].fillna("") == "SHARE"))].copy()
+            _dfm["Mapping Country"] = _dfm.apply(lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","") else r.get("Country of Risk",""), axis=1)
+            _dfm["Classification"] = _dfm["Mapping Country"].map(country_cls)
+            _dfm = _dfm[_dfm["Classification"].notna()].copy()
+            _dfm["adtv_best"] = _dfm["12M ADTV Y2025"].where(_dfm["12M ADTV Y2025"]>0, _dfm["6M ADTV Y2025"].where(_dfm["6M ADTV Y2025"]>0, _dfm["3M ADTV Y2025"].where(_dfm["3M ADTV Y2025"]>0, _dfm["1M ADTV Y2025"])))
+            _dfm["ATVR"] = np.where(_dfm["Total MCap Y2025"]>0, _dfm["adtv_best"]*252/_dfm["Total MCap Y2025"], 0)
+            _ecnm = _dfm["Exchange Country Name"].fillna("")
+            _dfm["IF"] = np.where(_ecnm.str.upper()=="CHINA", 0.20, np.where(_ecnm.str.upper()=="INDIA", 0.75, np.where(_ecnm.str.upper()=="VIETNAM", 0.50, np.where(_ecnm.str.upper()=="SAUDI ARABIA", 0.50, 1.0))))
+            _dfm["Adj_FF"] = _dfm["Free Float MCap Y2025"] * _dfm["IF"]
+
+            _combos = [
+                (0.10, 2e6, 1e6,    0,    0),
+                (0.10, 1.5e6, 1e6,  0,    0),
+                (0.10, 1.5e6, 750e3,0,    0),
+                (0.10, 1e6, 750e3,  0,    0),
+                (0.10, 2e6, 1e6,    0.20, 0.15),
+                (0.10, 1.5e6, 1e6,  0.20, 0.15),
+                (0.10, 1.5e6, 750e3,0.20, 0.15),
+                (0.10, 1e6, 750e3,  0.20, 0.15),
+                (0.15, 2e6, 1e6,    0,    0),
+                (0.15, 1.5e6, 1e6,  0,    0),
+                (0.15, 1.5e6, 750e3,0,    0),
+                (0.15, 1e6, 750e3,  0,    0),
+                (0.15, 2e6, 1e6,    0.20, 0.15),
+                (0.15, 1.5e6, 1e6,  0.20, 0.15),
+                (0.15, 1.5e6, 750e3,0.20, 0.15),
+                (0.15, 1e6, 750e3,  0.20, 0.15),
+            ]
+
+            _rows = []
+            for _ff, _dm_adtv, _em_adtv, _atvr_dm, _atvr_em in _combos:
+                _dmd = _dfm[_dfm["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
+                _tff = _dmd["Free Float MCap Y2025"].sum()
+                _dmd["_cp"] = _dmd["Free Float MCap Y2025"].cumsum() / _tff * 100
+                _ef = _dmd[_dmd["_cp"] >= 99].iloc[0]["Total MCap Y2025"]
+                _eff = _ef * 0.50
+                _me = (_dfm["Total MCap Y2025"] >= _ef) & (_dfm["Free Float MCap Y2025"] >= _eff) & (_dfm["Free Float Percent"] >= _ff)
+                _d2 = _dfm[_me].copy()
+                _ml = ((_d2["Classification"]=="DM") & (_d2["3M ADTV Y2025"]>=_dm_adtv) & (_d2["6M ADTV Y2025"]>=_dm_adtv) & (_d2["ATVR"]>=_atvr_dm)) |                       ((_d2["Classification"]=="EM") & (_d2["3M ADTV Y2025"]>=_em_adtv) & (_d2["6M ADTV Y2025"]>=_em_adtv) & (_d2["ATVR"]>=_atvr_em))
+                _d3 = _d2[_ml].copy()
+                _res = []
+                for _ctry, _grp in _d3.groupby("Mapping Country"):
+                    _grp = _grp.sort_values("Adj_FF", ascending=False).copy()
+                    _tot = _grp["Adj_FF"].sum()
+                    if _tot == 0: continue
+                    _grp["_c"] = _grp["Adj_FF"].cumsum() / _tot * 100
+                    _cut = _grp[_grp["_c"] >= 85].index
+                    _res.append(_grp.loc[:_cut[0]] if len(_cut) > 0 else _grp)
+                _d5 = pd.concat(_res, ignore_index=True)
+                _dm_n = (_d5["Classification"]=="DM").sum()
+                _em_n = (_d5["Classification"]=="EM").sum()
+                _rows.append({
+                    "FF%": f"{_ff*100:.0f}%",
+                    "ADTV DM": f"{_dm_adtv/1e6:.1f}M",
+                    "ADTV EM": f"{_em_adtv/1000:.0f}K" if _em_adtv < 1e6 else f"{_em_adtv/1e6:.1f}M",
+                    "ATVR DM": f"{_atvr_dm*100:.0f}%",
+                    "ATVR EM": f"{_atvr_em*100:.0f}%",
+                    "DM Stocks": int(_dm_n),
+                    "EM Stocks": int(_em_n),
+                    "ACWI": int(_dm_n + _em_n),
+                })
+            return pd.DataFrame(_rows)
+
+        _matrix_df = _compute_matrix(len(df_raw_original))
+
+        # Highlight current settings row
+        def _style_matrix(df):
+            _cur_ff = f"{v3_min_ff_pct*100:.0f}%"
+            _cur_dm = f"{v3_adtv_dm/1e6:.1f}M"
+            _cur_em = f"{v3_adtv_em/1000:.0f}K" if v3_adtv_em < 1e6 else f"{v3_adtv_em/1e6:.1f}M"
+            _cur_atvr_dm = f"{v3_atvr_dm_min*100:.0f}%"
+            _cur_atvr_em = f"{v3_atvr_em_min*100:.0f}%"
+            def _row_style(row):
+                if (row["FF%"] == _cur_ff and row["ADTV DM"] == _cur_dm and
+                    row["ADTV EM"] == _cur_em and row["ATVR DM"] == _cur_atvr_dm and
+                    row["ATVR EM"] == _cur_atvr_em):
+                    return ["background-color: #1a3a5c; font-weight: 700;"] * len(row)
+                return [""] * len(row)
+            return df.style.apply(_row_style, axis=1).background_gradient(
+                subset=["ACWI"], cmap="Blues", vmin=_matrix_df["ACWI"].min(), vmax=_matrix_df["ACWI"].max())
+        st.dataframe(_style_matrix(_matrix_df), use_container_width=True, hide_index=True)
+        st.caption("🔵 Hervorgehobene Zeile = aktuelle Sidebar-Einstellungen")
+
     # ── Country Charts ────────────────────────────────────────────────────────
     st.markdown("---")
     st.markdown("**V3 — Länderübersicht**")
