@@ -1929,7 +1929,7 @@ with tab_v3:
     st.markdown("---")
     st.markdown("**V3 — Länderübersicht**")
     _v3_country_basis = st.radio("Länder-Basis:", ["Mapping Country","Country of Incorp","Exchange Country Name"],
-        index=0, horizontal=True, key="v3_country_basis",
+        index=0, horizontal=True, key="v3_country_basis_v2",
         help="Basis für die Ländergruppierung in den Charts.")
     _v3_cb = _v3_country_basis if _v3_country_basis in _df_v3_included.columns else "Exchange Country Name"
 
@@ -1993,23 +1993,26 @@ with tab_v3:
 
     with _vd2:
         st.markdown("**Inclusion Factor Impact**")
-        _v3_if_map = {"China A-Shares":(["SHANGHAI","SHENZHEN"],china_inclusion_factor),
-                      "Indien":(["BSE INDIA","NSE INDIA"],india_inclusion_factor),
-                      "Vietnam":(["HANOI STOCK EXCHANGE","VIETNAM"],vietnam_inclusion_factor),
-                      "Saudi-Arabien":(["SAUDI ARABIA"],saudi_inclusion_factor)}
+        # Use Exchange Country Name (consistent with compute_variant3 Step 5)
+        _v3_if_map = {
+            "China A-Shares": ("CHINA",  china_inclusion_factor),
+            "Indien":         ("INDIA",  india_inclusion_factor),
+            "Vietnam":        ("VIETNAM",vietnam_inclusion_factor),
+            "Saudi-Arabien":  ("SAUDI ARABIA", saudi_inclusion_factor),
+        }
         _v3_if_rows = []
         _v3_total_ff_raw = _df_v3_included["Free Float MCap Y2025"].sum()
-        _v3_if_full = add_adjusted_weight(_df_v3_included, china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
-        _v3_total_adj_if = _v3_if_full["Adjusted FF MCap"].sum()
-        for _name, (_exch, _factor) in _v3_if_map.items():
-            _mask = _v3_if_full["Exchange Name"].isin(_exch)
-            _ff = _v3_if_full.loc[_mask,"Free Float MCap Y2025"].sum()
-            _adj = _v3_if_full.loc[_mask,"Adjusted FF MCap"].sum()
+        # Use Adj_FF_MCap already computed in pipeline (Step 5/9)
+        _v3_total_adj_if = _df_v3_included["Adj_FF_MCap"].sum() if "Adj_FF_MCap" in _df_v3_included.columns else _df_v3_included["Free Float MCap Y2025"].sum()
+        for _name, (_ecn, _factor) in _v3_if_map.items():
+            _mask = _df_v3_included["Exchange Country Name"].fillna("").str.upper() == _ecn.upper()
+            _ff  = _df_v3_included.loc[_mask, "Free Float MCap Y2025"].sum()
+            _adj = _df_v3_included.loc[_mask, "Adj_FF_MCap"].sum() if "Adj_FF_MCap" in _df_v3_included.columns else _ff * _factor
             if _ff > 0:
                 _v3_if_rows.append({"Land": _name, "Factor": f"{_factor*100:.0f}%",
-                    "Weight (vor)": round(_ff/_v3_total_ff_raw*100,4),
-                    "Weight (nach)": round(_adj/_v3_total_adj_if*100,4),
-                    "Δ": round(_adj/_v3_total_adj_if*100 - _ff/_v3_total_ff_raw*100,4)})
+                    "Weight (vor)": round(_ff/_v3_total_ff_raw*100, 4),
+                    "Weight (nach)": round(_adj/_v3_total_adj_if*100, 4),
+                    "Δ": round(_adj/_v3_total_adj_if*100 - _ff/_v3_total_ff_raw*100, 4)})
         if _v3_if_rows:
             _v3_if_df = pd.DataFrame(_v3_if_rows)
             _v3_if_df = pd.concat([_v3_if_df, pd.DataFrame([{"Land":"Total Weight","Factor":"—",
@@ -2451,7 +2454,7 @@ with tab_acwi:
     _available_bases = ["Mapping Country", "Country of Incorp", "Exchange Country Name"]
     _available_bases = [b for b in _available_bases if b in pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True).columns]
     _country_basis = st.radio("Länder-Basis:", _available_bases, index=0,
-        horizontal=True, key="country_basis_radio",
+        horizontal=True, key="country_basis_radio_v2",
         help="Mapping Country: Exchange wenn gleich Incorp, sonst Country of Risk. Country of Incorp: Gründungsland. Exchange Country Name: Börsenland.")
 
     _acwi_all = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
