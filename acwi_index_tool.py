@@ -656,6 +656,10 @@ with st.sidebar:
         with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
         coverage_on_adj = st.checkbox("85% Coverage auf Adj. FF MCap", value=True, key="v3_coverage_adj",
             help="AN (default): 85% Coverage sortiert nach Adj. FF MCap (nach Inclusion Factor) → ~2,450 Stocks. AUS: sortiert nach raw FF MCap → ~3,300 Stocks.")
+        v3_listing_mode = st.radio("Listing Universe:", 
+            ["Primary only (+ Secondary Schritt 8)", "All (Primary + Secondary)"],
+            index=0, key="v3_listing_mode",
+            help="Primary only: nur Primary Listings in der Pipeline, Secondary Share Classes werden in Schritt 8 ergänzt (methodisch korrekt). All: Primary + Secondary beide in der Pipeline.")
         use_gmsr_zones = st.checkbox("GMSR Zonen-Filter aktiv", value=False, key="v3_use_gmsr_zones",
             help="Wenn aktiv: GMSR-Zonen (AUTO_INCLUDE/CANDIDATE/BUFFER/EXCLUDE) werden angewendet → weniger Stocks (~953). Wenn inaktiv: alle EUMSS+Liquidität qualifizierten Stocks direkt zur 85% Coverage → mehr Stocks (~2,400).")
         include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
@@ -1329,7 +1333,32 @@ with tab_v3:
     st.subheader("Variant 3 — Dynamic GMSR/EUMSS (MSCI-Style)")
 
     # ── Run full V3 pipeline (Steps 3-6) ────────────────────────────────────────
-    _df_all = pd.concat([df_dm_full, df_em_full], ignore_index=True)
+    if v3_listing_mode.startswith("Primary only"):
+        # Primary only: rebuild from df_raw_original filtered to Primary
+        _df_v3_base = df_raw_original[df_raw_original["Listing"].fillna("") == "Primary"].copy()
+        # Apply same exclusions as global pipeline
+        _df_v3_base = _df_v3_base[_df_v3_base["Free Float MCap Y2025"].fillna(0) > 0].copy()
+        if exclude_hk_cny:
+            _df_v3_base = _df_v3_base[~(_df_v3_base["Exchange Ticker"].str.contains("HKG", na=False) & (_df_v3_base["Trading Currency"] == "CNY"))].copy()
+        if exclude_country_risk_na:
+            _df_v3_base = _df_v3_base[_df_v3_base["Country of Risk"].fillna("") != "@NA"].copy()
+        if exclude_naics_funds:
+            _df_v3_base = _df_v3_base[~_df_v3_base["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False)].copy()
+        if exclude_euro_mtf:
+            _df_v3_base = _df_v3_base[~_df_v3_base["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])].copy()
+        if exclude_etf_sicav:
+            import re as _re2
+            _df_v3_base = _df_v3_base[~_df_v3_base["Name"].fillna("").str.contains(_re2.compile(r'ETF|SICAV', _re2.IGNORECASE))].copy()
+        _th_mask_v3 = _df_v3_base["Exchange Name"].fillna("").str.upper() == "THAILAND"
+        _excl_type_v3 = "NVDR" if thailand_sec_type == "SHARE" else "SHARE"
+        _df_v3_base = _df_v3_base[~(_th_mask_v3 & (_df_v3_base["Sec Type"].fillna("") == _excl_type_v3))].copy()
+        _df_v3_base["Mapping Country"] = _df_v3_base.apply(lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","") else r.get("Country of Risk",""), axis=1)
+        _df_v3_base["Classification"] = _df_v3_base["Mapping Country"].map(country_cls)
+        _df_v3_base = _df_v3_base[_df_v3_base["Classification"].notna()].copy()
+        _df_all = _df_v3_base.copy()
+    else:
+        # All: use global df_dm_full + df_em_full (Primary + Secondary)
+        _df_all = pd.concat([df_dm_full, df_em_full], ignore_index=True)
     _df_v3, _v3_eumss_full, _v3_eumss_ff, _v3_dm_gmsr, _v3_em_gmsr = compute_variant3(
         _df_all,
         eumss_pct=v3_eumss_pct, eumss_ff_ratio=v3_eumss_ff_ratio, min_ff_pct=v3_min_ff_pct,
@@ -1520,7 +1549,7 @@ with tab_v3:
     _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3, sort_col=_v3_sort_col)
 
     # ── Step 8: Secondary Share Classes ──────────────────────────────────────
-    if include_secondary and len(_df_v3_step7) > 0:
+    if include_secondary and v3_listing_mode.startswith("Primary only") and len(_df_v3_step7) > 0:
         _df_v3_step8 = apply_step8_secondary(
             _df_v3_step7, df_raw_original,
             _v3_eumss_full, _v3_eumss_ff, v3_min_ff_pct,
