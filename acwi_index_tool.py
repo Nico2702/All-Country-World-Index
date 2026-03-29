@@ -679,9 +679,7 @@ with st.sidebar:
         _v3s, _v3t = st.columns([3, 4])
         with _v3s: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM Min. (%)</div>", unsafe_allow_html=True)
         with _v3t: _v3_atvr_em = st.text_input("EM ATVR", value="0", key="v3_atvr_em_v2", label_visibility="collapsed")
-        st.markdown("**Schritt 8**")
-        include_secondary = st.checkbox("Secondary Share Classes einschließen", value=True, key="v3_secondary",
-            help="Schritt 8: Secondary Listings mit gleicher Entity ID ergänzen.")
+
 
     try:    v3_eumss_pct      = float(_v3_eumss_pct) / 100
     except: v3_eumss_pct      = 0.99
@@ -1549,7 +1547,8 @@ with tab_v3:
     _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3, sort_col=_v3_sort_col)
 
     # ── Step 8: Secondary Share Classes ──────────────────────────────────────
-    if include_secondary and v3_listing_mode.startswith("Primary only") and len(_df_v3_step7) > 0:
+    include_secondary = v3_listing_mode.startswith("Primary only")
+    if include_secondary and len(_df_v3_step7) > 0:
         _df_v3_step8 = apply_step8_secondary(
             _df_v3_step7, df_raw_original,
             _v3_eumss_full, _v3_eumss_ff, v3_min_ff_pct,
