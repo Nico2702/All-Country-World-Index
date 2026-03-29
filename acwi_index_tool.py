@@ -206,28 +206,28 @@ def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.1
     return df, eumss_full, eumss_ff, dm_gmsr, em_gmsr
 
 
-def apply_step7_coverage(df_candidates, coverage_pct=0.85, country_col="Mapping Country"):
-    """Step 7: 85% coverage per country based on raw Free Float MCap.
-    Inclusion Factor is NOT used here — only for final weighting in Step 9.
+def apply_step7_coverage(df_candidates, coverage_pct=0.85, country_col="Mapping Country", sort_col="Free Float MCap Y2025"):
+    """Step 7: 85% coverage per country.
+    sort_col: "Adj_FF_MCap" (default per methodology) or "Free Float MCap Y2025" (raw FF MCap).
     Returns subset of df that passes coverage threshold per country.
     """
     results = []
     country_col = country_col if country_col in df_candidates.columns else "Exchange Country Name"
+    if sort_col not in df_candidates.columns:
+        sort_col = "Free Float MCap Y2025"
     for country, grp in df_candidates.groupby(country_col):
-        grp = grp.sort_values("Free Float MCap Y2025", ascending=False).copy()
-        total_ff = grp["Free Float MCap Y2025"].sum()
-        if total_ff == 0:
+        grp = grp.sort_values(sort_col, ascending=False).copy()
+        total = grp[sort_col].sum()
+        if total == 0:
             continue
-        grp["_cum_ff"] = grp["Free Float MCap Y2025"].cumsum()
-        grp["_cum_ff_pct"] = grp["_cum_ff"] / total_ff * 100
+        grp["_cum"] = grp[sort_col].cumsum()
+        grp["_cum_pct"] = grp["_cum"] / total * 100
         target = coverage_pct * 100
-        # Find cutoff index — include the stock that crosses the threshold
-        cutoff_idx = grp[grp["_cum_ff_pct"] >= target].index
+        cutoff_idx = grp[grp["_cum_pct"] >= target].index
         if len(cutoff_idx) == 0:
             results.append(grp)
         else:
-            include_up_to = cutoff_idx[0]
-            results.append(grp.loc[:include_up_to])
+            results.append(grp.loc[:cutoff_idx[0]])
     if results:
         return pd.concat(results, ignore_index=True)
     return pd.DataFrame(columns=df_candidates.columns)
@@ -654,6 +654,8 @@ with st.sidebar:
         _v3o, _v3p = st.columns([3, 4])
         with _v3o: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>BUFFER</div>", unsafe_allow_html=True)
         with _v3p: _v3_buf = st.text_input("BUFFER", value="0.33", key="v3_buf", label_visibility="collapsed")
+        coverage_on_adj = st.checkbox("85% Coverage auf Adj. FF MCap", value=True, key="v3_coverage_adj",
+            help="AN (default): 85% Coverage sortiert nach Adj. FF MCap (nach Inclusion Factor) → ~2,450 Stocks. AUS: sortiert nach raw FF MCap → ~3,300 Stocks.")
         use_gmsr_zones = st.checkbox("GMSR Zonen-Filter aktiv", value=False, key="v3_use_gmsr_zones",
             help="Wenn aktiv: GMSR-Zonen (AUTO_INCLUDE/CANDIDATE/BUFFER/EXCLUDE) werden angewendet → weniger Stocks (~953). Wenn inaktiv: alle EUMSS+Liquidität qualifizierten Stocks direkt zur 85% Coverage → mehr Stocks (~2,400).")
         include_buffer = st.checkbox("BUFFER einschließen (Erstberechnung)", value=False, key="v3_include_buffer",
@@ -1514,7 +1516,8 @@ with tab_v3:
         # Without GMSR zones: all stocks that passed EUMSS + Liquidity filters
         _df_v3_candidates = _df_v3[_df_v3["EUMSS_Pass"] & _df_v3["ADTV_Pass"] & _df_v3["ATVR_Pass"]].copy()
     _map_col_v3 = "Mapping Country" if "Mapping Country" in _df_v3_candidates.columns else "Exchange Country Name"
-    _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3)
+    _v3_sort_col = "Adj_FF_MCap" if coverage_on_adj else "Free Float MCap Y2025"
+    _df_v3_step7 = apply_step7_coverage(_df_v3_candidates, coverage_pct=0.85, country_col=_map_col_v3, sort_col=_v3_sort_col)
 
     # ── Step 8: Secondary Share Classes ──────────────────────────────────────
     if include_secondary and len(_df_v3_step7) > 0:
