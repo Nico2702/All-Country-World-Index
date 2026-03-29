@@ -1993,19 +1993,31 @@ with tab_v3:
 
     with _vd2:
         st.markdown("**Inclusion Factor Impact**")
-        # Use Exchange Country Name (consistent with compute_variant3 Step 5)
-        _v3_if_map = {
-            "China A-Shares": ("CHINA",  china_inclusion_factor),
-            "Indien":         ("INDIA",  india_inclusion_factor),
-            "Vietnam":        ("VIETNAM",vietnam_inclusion_factor),
-            "Saudi-Arabien":  ("SAUDI ARABIA", saudi_inclusion_factor),
-        }
         _v3_if_rows = []
         _v3_total_ff_raw = _df_v3_included["Free Float MCap Y2025"].sum()
-        # Use Adj_FF_MCap already computed in pipeline (Step 5/9)
         _v3_total_adj_if = _df_v3_included["Adj_FF_MCap"].sum() if "Adj_FF_MCap" in _df_v3_included.columns else _df_v3_included["Free Float MCap Y2025"].sum()
-        for _name, (_ecn, _factor) in _v3_if_map.items():
-            _mask = _df_v3_included["Exchange Country Name"].fillna("").str.upper() == _ecn.upper()
+
+        # Build IF rows — China split into A-Shares and H-Shares
+        _if_entries = [
+            # (label, mask, factor)
+            ("China A-Shares (IF 20%)",
+             _df_v3_included["Exchange Country Name"].fillna("").str.upper() == "CHINA",
+             china_inclusion_factor),
+            ("China H-Shares / Red Chips (IF 100%)",
+             (_df_v3_included["Mapping Country"].fillna("").str.upper() == "CHINA") &
+             (_df_v3_included["Exchange Country Name"].fillna("").str.upper() != "CHINA"),
+             1.0),
+            ("Indien",
+             _df_v3_included["Exchange Country Name"].fillna("").str.upper() == "INDIA",
+             india_inclusion_factor),
+            ("Vietnam",
+             _df_v3_included["Exchange Country Name"].fillna("").str.upper() == "VIETNAM",
+             vietnam_inclusion_factor),
+            ("Saudi-Arabien",
+             _df_v3_included["Exchange Country Name"].fillna("").str.upper() == "SAUDI ARABIA",
+             saudi_inclusion_factor),
+        ]
+        for _name, _mask, _factor in _if_entries:
             _ff  = _df_v3_included.loc[_mask, "Free Float MCap Y2025"].sum()
             _adj = _df_v3_included.loc[_mask, "Adj_FF_MCap"].sum() if "Adj_FF_MCap" in _df_v3_included.columns else _ff * _factor
             if _ff > 0:
