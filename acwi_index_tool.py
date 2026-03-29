@@ -1891,21 +1891,29 @@ with tab_v3:
 
         _matrix_df = _compute_matrix(len(df_raw_original))
 
-        # Highlight current settings row
+        # Highlight current settings row + manual ACWI color gradient
         def _style_matrix(df):
             _cur_ff = f"{v3_min_ff_pct*100:.0f}%"
             _cur_dm = f"{v3_adtv_dm/1e6:.1f}M"
             _cur_em = f"{v3_adtv_em/1000:.0f}K" if v3_adtv_em < 1e6 else f"{v3_adtv_em/1e6:.1f}M"
             _cur_atvr_dm = f"{v3_atvr_dm_min*100:.0f}%"
             _cur_atvr_em = f"{v3_atvr_em_min*100:.0f}%"
+            _min_acwi = df["ACWI"].min()
+            _max_acwi = df["ACWI"].max()
+            def _cell_style(val):
+                if _max_acwi == _min_acwi: return "background-color: #1a2a4a"
+                _t = (val - _min_acwi) / (_max_acwi - _min_acwi)
+                _r = int(20 + _t * 20)
+                _g = int(40 + _t * 80)
+                _b = int(80 + _t * 100)
+                return f"background-color: rgb({_r},{_g},{_b}); color: white; font-weight: 600"
             def _row_style(row):
                 if (row["FF%"] == _cur_ff and row["ADTV DM"] == _cur_dm and
                     row["ADTV EM"] == _cur_em and row["ATVR DM"] == _cur_atvr_dm and
                     row["ATVR EM"] == _cur_atvr_em):
-                    return ["background-color: #1a3a5c; font-weight: 700;"] * len(row)
+                    return ["background-color: #1a3a5c; font-weight: 700; border: 1px solid #42a5f5;"] * len(row)
                 return [""] * len(row)
-            return df.style.apply(_row_style, axis=1).background_gradient(
-                subset=["ACWI"], cmap="Blues", vmin=_matrix_df["ACWI"].min(), vmax=_matrix_df["ACWI"].max())
+            return df.style.apply(_row_style, axis=1).applymap(_cell_style, subset=["ACWI"])
         st.dataframe(_style_matrix(_matrix_df), use_container_width=True, hide_index=True)
         st.caption("🔵 Hervorgehobene Zeile = aktuelle Sidebar-Einstellungen")
 
