@@ -530,13 +530,13 @@ with st.sidebar:
     st.caption("IF Anwendung (Tabs 3–5)")
     if_selection_mode = st.radio(
         "IF greift bei:",
-        ["Selektion + Gewichtung", "Nur Gewichtung"],
+        ["Selektion", "Gewichtung"],
         index=0,
         horizontal=True,
         key="if_selection_mode",
-        help="Selektion + Gewichtung: Adj_FF_MCap bestimmt Segment-Zuteilung (Large/Mid/Small).\nNur Gewichtung: FF MCap bestimmt Selektion, IF wird nur für finale Indexgewichte angewendet."
+        help="Selektion: Adj_FF_MCap bestimmt Segment-Zuteilung (Large/Mid/Small).\nGewichtung: FF MCap bestimmt Selektion, IF wird nur für finale Indexgewichte angewendet."
     )
-    if_sort_col = "Adj_FF_MCap" if if_selection_mode == "Selektion + Gewichtung" else "Free Float MCap Y2025"
+    if_sort_col = "Adj_FF_MCap" if if_selection_mode == "Selektion" else "Free Float MCap Y2025"
 
     st.markdown("---")
     st.markdown("### 🔧 Tab-spezifisch")
