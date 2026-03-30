@@ -1300,8 +1300,8 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
 
     def seg_table(df_cls, label):
         rows = []
-        total_ff = df_cls["Free Float MCap Y2025"].sum()
-        total_adj_cls = df_cls["Adj_FF_MCap"].sum()
+        std = df_cls[df_cls["Segment_New"].isin(["Large Cap","Mid Cap"])]
+        std_adj = std["Adj_FF_MCap"].sum()
         for seg in seg_order:
             s = df_cls[df_cls["Segment_New"]==seg]
             rows.append({
@@ -1309,16 +1309,15 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
                 "Stocks": len(s),
                 "FF MCap": format_bn(s["Free Float MCap Y2025"].sum()) if len(s)>0 else "—",
                 "Adj. FF MCap": format_bn(s["Adj_FF_MCap"].sum()) if len(s)>0 else "—",
-                "Weight %": f"{s['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 and len(s)>0 else "—",
+                "Weight %": f"{s['Adj_FF_MCap'].sum()/std_adj*100:.2f}%" if std_adj>0 and len(s)>0 else "—",
             })
         # Standard Index subtotal
-        std = df_cls[df_cls["Segment_New"].isin(["Large Cap","Mid Cap"])]
         rows.insert(2, {
             "Segment": f"── {label} Index (Large+Mid)",
             "Stocks": len(std),
             "FF MCap": format_bn(std["Free Float MCap Y2025"].sum()),
             "Adj. FF MCap": format_bn(std["Adj_FF_MCap"].sum()),
-            "Weight %": f"{std['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—",
+            "Weight %": "100.00%",
         })
         return pd.DataFrame(rows)
 
@@ -1341,6 +1340,13 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
                 return [""]*len(row)
             return df.style.apply(rs, axis=1)
         st.dataframe(_style_em_seg(_em_seg), use_container_width=True, hide_index=True)
+
+    st.markdown("""
+<div class="info-box">
+<b>Weight %</b> — DM Segmente: Anteil am World Index (DM Large+Mid) &nbsp;|&nbsp; EM Segmente: Anteil am EM Index (EM Large+Mid)<br>
+Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen.
+</div>
+""", unsafe_allow_html=True)
 
     # ── Country Breakdown ─────────────────────────────────────────────────────
     st.markdown("---")
