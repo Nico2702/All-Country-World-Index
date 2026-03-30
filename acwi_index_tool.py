@@ -1284,6 +1284,16 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
         return df.style.apply(rs, axis=1)
     st.dataframe(_style_idx(_idx_df), use_container_width=True, hide_index=True)
 
+    st.markdown("""
+<div class="info-box">
+🌍 <b>World Index</b> — DM Large Cap + Mid Cap &nbsp;|&nbsp;
+🌏 <b>EM Index</b> — EM Large Cap + Mid Cap &nbsp;|&nbsp;
+🌐 <b>ACWI Index</b> — World Index + EM Index<br>
+🌍+ <b>World IMI</b> — World Index + DM Small Cap &nbsp;|&nbsp;
+🌐+ <b>ACWI IMI</b> — ACWI Index + DM Small Cap + EM Small Cap
+</div>
+""", unsafe_allow_html=True)
+
     # ── Segment Tables ────────────────────────────────────────────────────────
     st.markdown("---")
     _sc1, _sc2 = st.columns(2)
