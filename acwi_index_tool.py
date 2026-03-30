@@ -1336,25 +1336,29 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
     st.markdown("---")
     _cc1, _cc2 = st.columns(2)
 
-    def country_table(df_cls):
+    _acwi_dm_std = df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _acwi_em_std = df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _acwi_std_adj = _acwi_dm_std["Adj_FF_MCap"].sum() + _acwi_em_std["Adj_FF_MCap"].sum()
+
+    def country_table(df_cls, cls_adj):
         ct = df_cls.groupby("Mapping Country").agg(
             Stocks=("Symbol","count"),
             FF_MCap=("Free Float MCap Y2025","sum"),
             Adj_MCap=("Adj_FF_MCap","sum"),
-            Avg_MCap=("Total MCap Y2025","mean"),
+            Avg_MCap=("Adj_FF_MCap","mean"),
         ).reset_index().sort_values("Adj_MCap", ascending=False)
         ct["FF MCap"] = ct["FF_MCap"].apply(format_bn)
-        ct["Avg MCap"] = ct["Avg_MCap"].apply(format_bn)
-        ct["Weight %"] = (ct["Adj_MCap"]/total_adj*100).apply(lambda x: f"{x:.2f}%")
-        return ct[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"})
+        ct["Avg Adj. MCap"] = ct["Avg_MCap"].apply(format_bn)
+        ct["Weight %"] = (ct["Adj_MCap"] / cls_adj * 100).apply(lambda x: f"{x:.2f}%") if cls_adj > 0 else "—"
+        return ct[["Mapping Country","Stocks","FF MCap","Avg Adj. MCap","Weight %"]].rename(columns={"Mapping Country":"Land"})
 
     with _cc1:
-        st.markdown(f"**DM Country Breakdown ({len(df_dm):,} Stocks)**")
-        st.dataframe(country_table(df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]),
+        st.markdown(f"**DM Country Breakdown ({len(_acwi_dm_std):,} Stocks — Large+Mid)**")
+        st.dataframe(country_table(_acwi_dm_std, _acwi_dm_std["Adj_FF_MCap"].sum()),
                      use_container_width=True, hide_index=True)
     with _cc2:
-        st.markdown(f"**EM Country Breakdown ({len(df_em):,} Stocks)**")
-        st.dataframe(country_table(df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]),
+        st.markdown(f"**EM Country Breakdown ({len(_acwi_em_std):,} Stocks — Large+Mid)**")
+        st.dataframe(country_table(_acwi_em_std, _acwi_em_std["Adj_FF_MCap"].sum()),
                      use_container_width=True, hide_index=True)
 
     # ── Country Charts ────────────────────────────────────────────────────────
