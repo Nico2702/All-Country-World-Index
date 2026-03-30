@@ -527,6 +527,17 @@ with st.sidebar:
     try:    saudi_inclusion_factor   = float(_saudi_raw)   / 100 if use_saudi_factor   else 1.0
     except: saudi_inclusion_factor   = 0.50
 
+    st.caption("IF Anwendung (Tabs 3–5)")
+    if_selection_mode = st.radio(
+        "IF greift bei:",
+        ["Selektion + Gewichtung", "Nur Gewichtung"],
+        index=0,
+        horizontal=True,
+        key="if_selection_mode",
+        help="Selektion + Gewichtung: Adj_FF_MCap bestimmt Segment-Zuteilung (Large/Mid/Small).\nNur Gewichtung: FF MCap bestimmt Selektion, IF wird nur für finale Indexgewichte angewendet."
+    )
+    if_sort_col = "Adj_FF_MCap" if if_selection_mode == "Selektion + Gewichtung" else "Free Float MCap Y2025"
+
     st.markdown("---")
     st.markdown("### 🔧 Tab-spezifisch")
     st.caption("Tab 2 — ACWI")
@@ -1412,8 +1423,8 @@ with tab_gs:
 
     # Global sort → segments
     _gs_sorted = _gs_liq.sort_values("Total MCap Y2025", ascending=False).copy()
-    _gs_adj_tot = _gs_sorted["Adj_FF_MCap"].sum()
-    _gs_sorted["_cum_pct"] = _gs_sorted["Adj_FF_MCap"].cumsum() / _gs_adj_tot * 100 if _gs_adj_tot>0 else 0
+    _gs_sort_tot = _gs_sorted[if_sort_col].sum()
+    _gs_sorted["_cum_pct"] = _gs_sorted[if_sort_col].cumsum() / _gs_sort_tot * 100 if _gs_sort_tot>0 else 0
     _gs_sorted["Segment_New"] = np.where(_gs_sorted["_cum_pct"] <= large_thr, "Large Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= mid_thr,   "Mid Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= small_thr, "Small Cap", "Micro Cap")))
@@ -1449,7 +1460,7 @@ with tab_pc:
     _pc_liq = apply_liquidity_new(_pc_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
     _pc_seg = assign_segments_new(_pc_liq, large_thr, mid_thr, small_thr,
-        group_col="Mapping Country", sort_col="Adj_FF_MCap")
+        group_col="Mapping Country", sort_col=if_sort_col)
 
     _pc_final = add_secondary_listings(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
@@ -1500,18 +1511,18 @@ with tab_gimi:
         # Pre-liquidity filter
         _gm_liq = apply_liquidity_new(_gm_eumss, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
-        # Coverage per country on Adj_FF_MCap → Standard Index
+        # Coverage per country → Standard Index (sort_col: if_sort_col)
         _gm_results = []
         for _ctry, _grp in _gm_liq.groupby("Mapping Country"):
-            _grp = _grp.sort_values("Adj_FF_MCap", ascending=False).copy()
-            _tot = _grp["Adj_FF_MCap"].sum()
+            _grp = _grp.sort_values(if_sort_col, ascending=False).copy()
+            _tot = _grp[if_sort_col].sum()
             if _tot == 0: continue
-            _grp["_c"] = _grp["Adj_FF_MCap"].cumsum() / _tot * 100
+            _grp["_c"] = _grp[if_sort_col].cumsum() / _tot * 100
             _cut = _grp[_grp["_c"] >= mid_thr].index
             _inc = _grp.loc[:_cut[0]] if len(_cut)>0 else _grp
-            _tot_inc = _inc["Adj_FF_MCap"].sum()
+            _tot_inc = _inc[if_sort_col].sum()
             _inc = _inc.copy()
-            _inc["_cp2"] = _inc["Adj_FF_MCap"].cumsum() / _tot_inc * 100 if _tot_inc>0 else 0
+            _inc["_cp2"] = _inc[if_sort_col].cumsum() / _tot_inc * 100 if _tot_inc>0 else 0
             _inc["Segment_New"] = np.where(_inc["_cp2"] <= large_thr, "Large Cap", "Mid Cap")
             _gm_results.append(_inc)
 
