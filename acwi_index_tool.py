@@ -851,9 +851,9 @@ with tab_overview:
     _m = _th_mask_ov & (_exc_df["Sec Type"].fillna("") == _excl_type_ov) & (_exc_reason == "")
     _exc_reason[_m] = f"Thailand Sec Type ({_excl_type_ov} excluded)"
 
-    # 2. FF MCap = 0
+    # 2. FF MCap = 0 / negativ / fehlend
     _m = (_exc_df["Free Float MCap Y2025"] <= 0) & (_exc_reason == "")
-    _exc_reason[_m] = "FF MCap = 0"
+    _exc_reason[_m] = "FF MCap = 0, negativ oder fehlend"
 
     # 3. Max Closing Price
     if max_closing_price:
