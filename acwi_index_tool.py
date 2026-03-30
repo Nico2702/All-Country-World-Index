@@ -1695,6 +1695,171 @@ with tab_gimi:
         st.error("Keine DM Stocks gefunden.")
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LIQUIDITY MATRIX — Cached computation
+# ══════════════════════════════════════════════════════════════════════════════
+@st.cache_data
+def compute_liquidity_matrix(
+    _df_raw_orig, _df_raw_all, _country_cls,
+    thailand_mode, max_price,
+    excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
+    china_if, india_if, vietnam_if, saudi_if,
+    large_thr, mid_thr, small_thr,
+    eumss_ff_ratio, em_threshold_pct,
+):
+    """Compute ACWI stock count for all 48 parameter combinations × 4 methods."""
+    matrix_params = [
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+    ]
+
+    results = []
+    for p in matrix_params:
+        adtv_dm = p["ADTV_DM"]
+        adtv_em = p["ADTV_EM"]
+        atvr_dm = p["ATVR_DM"] / 100
+        atvr_em = p["ATVR_EM"] / 100
+        ff_pct  = p["Free Float %"]
+        if_mode = p["IF greift bei:"]
+        sort_col = "Adj_FF_MCap" if if_mode == "Selektion" else "Free Float MCap Y2025"
+
+        # Build primary-only universe
+        u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
+            excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
+            china_if, india_if, vietnam_if, saudi_if)
+        u = u[u["Free Float Percent"] >= ff_pct].copy()
+
+        # --- Global Sort ---
+        liq_gs = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
+        gs_s = liq_gs.sort_values("Total MCap Y2025", ascending=False).copy()
+        tot = gs_s[sort_col].sum()
+        gs_s["_c"] = gs_s[sort_col].cumsum() / tot * 100 if tot > 0 else 0
+        gs_s["Segment_New"] = np.where(gs_s["_c"] <= large_thr, "Large Cap",
+                              np.where(gs_s["_c"] <= mid_thr, "Mid Cap",
+                              np.where(gs_s["_c"] <= small_thr, "Small Cap", "Micro Cap")))
+        gs_count = gs_s[gs_s["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+
+        # --- Per Country ---
+        liq_pc = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
+        pc_s = assign_segments_new(liq_pc, large_thr, mid_thr, small_thr,
+            group_col="Mapping Country", sort_col=sort_col)
+        pc_count = pc_s[pc_s["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+
+        # --- GIMI ---
+        gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
+        gm_ff_tot = gm_dm_all["Free Float MCap Y2025"].sum()
+        gm_count = 0
+        if gm_ff_tot > 0:
+            gm_dm_all["_cp"] = gm_dm_all["Free Float MCap Y2025"].cumsum() / gm_ff_tot * 100
+            eumss_rows = gm_dm_all[gm_dm_all["_cp"] >= small_thr]
+            if len(eumss_rows) > 0:
+                eumss_full = eumss_rows.iloc[0]["Total MCap Y2025"]
+                eumss_ff   = eumss_full * eumss_ff_ratio
+                mask_e = ((u["Total MCap Y2025"] >= eumss_full) &
+                          (u["Free Float MCap Y2025"] >= eumss_ff) &
+                          (u["Free Float Percent"] >= ff_pct))
+                gm_e = u[mask_e].copy()
+                gm_liq = apply_liquidity_new(gm_e, adtv_dm, adtv_em, atvr_dm, atvr_em)
+                gm_res = []
+                for _, grp in gm_liq.groupby("Mapping Country"):
+                    grp = grp.sort_values(sort_col, ascending=False).copy()
+                    tot_g = grp[sort_col].sum()
+                    if tot_g == 0: continue
+                    grp["_c"] = grp[sort_col].cumsum() / tot_g * 100
+                    cut = grp[grp["_c"] >= mid_thr].index
+                    inc = grp.loc[:cut[0]] if len(cut) > 0 else grp
+                    tot_i = inc[sort_col].sum()
+                    inc = inc.copy()
+                    inc["_cp2"] = inc[sort_col].cumsum() / tot_i * 100 if tot_i > 0 else 0
+                    inc["Segment_New"] = np.where(inc["_cp2"] <= large_thr, "Large Cap", "Mid Cap")
+                    gm_res.append(inc)
+                if gm_res:
+                    gm_std = pd.concat(gm_res, ignore_index=True)
+                    gm_count = gm_std[gm_std["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+
+        # --- ACWI V1 + Threshold (All listings) ---
+        df_all = _df_raw_all[_df_raw_all["Classification"].notna()].copy()
+        df_all = df_all[df_all["Free Float Percent"] >= ff_pct].copy()
+        mask_post = (
+            ((df_all["Classification"]=="DM") & (df_all["3M ADTV Y2025"]>=adtv_dm) & (df_all["6M ADTV Y2025"]>=adtv_dm)) |
+            ((df_all["Classification"]=="EM") & (df_all["3M ADTV Y2025"]>=adtv_em) & (df_all["6M ADTV Y2025"]>=adtv_em))
+        )
+        df_post = df_all[mask_post].copy()
+        df_dm_p = df_post[df_post["Classification"]=="DM"].copy()
+        df_em_p = df_post[df_post["Classification"]=="EM"].copy()
+        seg_v1 = compute_variant1(df_dm_p, large_thr, mid_thr, small_thr)
+        cutoff = get_dm_cutoff_stock(seg_v1)
+        acwi_count = 0
+        if cutoff is not None:
+            dm_acwi = seg_v1[seg_v1["Segment"].isin(["Large Cap","Mid Cap"])]
+            em_res = filter_em_by_threshold(df_em_p, cutoff["Total MCap Y2025"], em_threshold_pct)
+            em_acwi = em_res[0] if isinstance(em_res, tuple) else em_res
+            em_acwi = em_acwi[em_acwi["Segment"]=="EM Included"] if "Segment" in em_acwi.columns else em_acwi
+            acwi_count = len(dm_acwi) + len(em_acwi)
+
+        results.append({
+            "IF greift bei:": if_mode,
+            "Free Float %": f"{ff_pct*100:.0f}%",
+            "ADTV DM": f"{adtv_dm/1e6:.1f}M",
+            "ADTV EM": f"{adtv_em/1000:.0f}K",
+            "ATVR DM": f"{p['ATVR_DM']}%",
+            "ATVR EM": f"{p['ATVR_EM']}%",
+            "ACWI (DM + EM)": acwi_count,
+            "Global Sort": gs_count,
+            "Per Country": pc_count,
+            "GIMI Method": gm_count,
+        })
+
+    return pd.DataFrame(results)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6: ACWI & Varianten Vergleich
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1795,3 +1960,35 @@ with tab_compare:
 
     except Exception as _e:
         st.warning(f"⚠️ Bitte zuerst alle Tabs aufrufen damit alle Varianten berechnet werden. ({_e})")
+
+    # ── Liquidity Matrix ──────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("## 🧮 Liquidity Matrix")
+    st.caption("ACWI Stock Count (Large+Mid) für alle 48 Parameterkombinationen × 4 Methoden")
+
+    with st.spinner("Berechne Liquidity Matrix (48 × 4 Kombinationen)..."):
+        _lm_df = compute_liquidity_matrix(
+            df_raw_original, df_raw_all, country_cls,
+            thailand_sec_type, max_closing_price,
+            exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds,
+            exclude_euro_mtf, exclude_etf_sicav,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor,
+            large_thr, mid_thr, small_thr,
+            new_eumss_ff_ratio, em_threshold_pct,
+        )
+
+    def _style_lm(df):
+        styles = pd.DataFrame("", index=df.index, columns=df.columns)
+        for col in ["ACWI (DM + EM)", "Global Sort", "Per Country", "GIMI Method"]:
+            if col in df.columns:
+                vals = pd.to_numeric(df[col], errors="coerce")
+                vmin, vmax = vals.min(), vals.max()
+                if vmax > vmin:
+                    for idx in df.index:
+                        v = vals[idx]
+                        intensity = int((v - vmin) / (vmax - vmin) * 60)
+                        styles.loc[idx, col] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
+        return styles
+
+    st.dataframe(_lm_df.style.apply(_style_lm, axis=None), use_container_width=True, hide_index=True, height=500)
