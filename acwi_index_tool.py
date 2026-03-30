@@ -112,126 +112,6 @@ def compute_variant2(df_dm, large_pct, mid_pct, small_pct):
     return pd.concat(results, ignore_index=True)
 
 
-def compute_variant3(df_all, eumss_pct=0.99, eumss_ff_ratio=0.50, min_ff_pct=0.15,
-                      gmsr_pct=0.85, em_gmsr_ratio=0.50,
-                      auto_mult=1.15, cand_mult=0.50, buf_mult=0.33,
-                      atvr_dm_min=0.20, atvr_em_min=0.15,
-                      adtv_dm_3m=2e6, adtv_dm_6m=2e6, adtv_em_3m=1e6, adtv_em_6m=1e6,
-                      china_if=0.20, india_if=0.75, vietnam_if=0.50, saudi_if=0.50):
-    """Full NaroIX V3 methodology — Steps 3-6.
-    Implements EUMSS, ATVR, Inclusion Factors, GMSR and Zone assignment.
-    Steps 7 (85% coverage) and 8 (secondary) handled separately in the tab.
-    Returns (df_annotated, eumss_full, eumss_ff, dm_gmsr, em_gmsr)
-    """
-    df = df_all.copy()
-
-    # ── Step 3: Compute EUMSS on ALL DM stocks ───────────────────────────────
-    df_dm_all = df[df["Classification"] == "DM"].sort_values("Total MCap Y2025", ascending=False).copy()
-    total_ff_dm = df_dm_all["Free Float MCap Y2025"].sum()
-    if total_ff_dm == 0:
-        df["Zone"] = "EXCLUDE"
-        return df, 0, 0, 0, 0
-
-    df_dm_all["_cum_ff"] = df_dm_all["Free Float MCap Y2025"].cumsum()
-    df_dm_all["_cum_pct"] = df_dm_all["_cum_ff"] / total_ff_dm * 100
-    eumss_row = df_dm_all[df_dm_all["_cum_pct"] >= eumss_pct * 100].iloc[0]
-    eumss_full = eumss_row["Total MCap Y2025"]
-    eumss_ff   = eumss_full * eumss_ff_ratio
-
-    # EUMSS filter mask
-    mask_eumss = (
-        (df["Total MCap Y2025"] >= eumss_full) &
-        (df["Free Float MCap Y2025"] >= eumss_ff) &
-        (df["Free Float Percent"] >= min_ff_pct)
-    )
-    df["EUMSS_Pass"] = mask_eumss
-    df["EUMSS_FULL"] = eumss_full
-    df["EUMSS_FF"]   = eumss_ff
-
-    # ── Step 4: ADTV + ATVR filter ───────────────────────────────────────────
-    # ADTV best fallback: 12M → 6M → 3M → 1M
-    df["_adtv_best"] = df["12M ADTV Y2025"].where(df["12M ADTV Y2025"] > 0,
-                       df["6M ADTV Y2025"].where(df["6M ADTV Y2025"] > 0,
-                       df["3M ADTV Y2025"].where(df["3M ADTV Y2025"] > 0,
-                       df["1M ADTV Y2025"])))
-    df["ATVR"] = np.where(df["Total MCap Y2025"] > 0,
-                          df["_adtv_best"] * 252 / df["Total MCap Y2025"], 0)
-
-    # ADTV 3M + 6M filter
-    mask_adtv_dm = (df["Classification"] == "DM") & (df["3M ADTV Y2025"] >= adtv_dm_3m) & (df["6M ADTV Y2025"] >= adtv_dm_6m)
-    mask_adtv_em = (df["Classification"] == "EM") & (df["3M ADTV Y2025"] >= adtv_em_3m) & (df["6M ADTV Y2025"] >= adtv_em_6m)
-    df["ADTV_Pass"] = mask_adtv_dm | mask_adtv_em
-
-    # ATVR filter
-    mask_atvr_dm = (df["Classification"] == "DM") & (df["ATVR"] >= atvr_dm_min)
-    mask_atvr_em = (df["Classification"] == "EM") & (df["ATVR"] >= atvr_em_min)
-    df["ATVR_Pass"] = mask_atvr_dm | mask_atvr_em
-
-    # ── Step 5: Inclusion Factor + Adj_FF_MCap ───────────────────────────────
-    # Based on Exchange Country Name (not Exchange Name)
-    ecn = df["Exchange Country Name"].fillna("")
-    df["Inclusion_Factor_V3"] = np.where(ecn.str.upper() == "CHINA",        china_if,
-                                np.where(ecn.str.upper() == "INDIA",        india_if,
-                                np.where(ecn.str.upper() == "VIETNAM",      vietnam_if,
-                                np.where(ecn.str.upper() == "SAUDI ARABIA", saudi_if, 1.0))))
-    df["Adj_FF_MCap"] = df["Free Float MCap Y2025"] * df["Inclusion_Factor_V3"]
-
-    # ── Step 6: Compute GMSR on EUMSS+ATVR filtered DM stocks using Adj_FF_MCap
-    mask_dm_pass = mask_eumss & df["ADTV_Pass"] & df["ATVR_Pass"] & (df["Classification"] == "DM")
-    df_dm_filtered = df[mask_dm_pass].sort_values("Total MCap Y2025", ascending=False).copy()
-    total_adj_dm_f = df_dm_filtered["Adj_FF_MCap"].sum()
-    if total_adj_dm_f == 0:
-        df["Zone"] = "EXCLUDE"
-        return df, eumss_full, eumss_ff, 0, 0
-
-    df_dm_filtered["_cum_adj"] = df_dm_filtered["Adj_FF_MCap"].cumsum()
-    df_dm_filtered["_cum_adj_pct"] = df_dm_filtered["_cum_adj"] / total_adj_dm_f * 100
-    gmsr_row = df_dm_filtered[df_dm_filtered["_cum_adj_pct"] >= gmsr_pct * 100].iloc[0]
-    dm_gmsr = gmsr_row["Total MCap Y2025"]
-    em_gmsr = dm_gmsr * em_gmsr_ratio
-
-    df["DM_GMSR"]    = dm_gmsr
-    df["EM_GMSR"]    = em_gmsr
-    df["GMSR_TITEL"] = np.where(df["Classification"] == "DM", dm_gmsr, em_gmsr)
-
-    # Zone assignment (vectorized)
-    ratio = np.where(df["GMSR_TITEL"] > 0, df["Total MCap Y2025"] / df["GMSR_TITEL"], 0)
-    zone = np.where(~mask_eumss | ~df["ADTV_Pass"] | ~df["ATVR_Pass"],  "EXCLUDE",
-           np.where(ratio > auto_mult,                  "AUTO_INCLUDE",
-           np.where(ratio >= cand_mult,                 "CANDIDATE",
-           np.where(ratio >= buf_mult,                  "BUFFER",
-                                                        "EXCLUDE"))))
-    df["Zone"] = zone
-
-    return df, eumss_full, eumss_ff, dm_gmsr, em_gmsr
-
-
-def apply_step7_coverage(df_candidates, coverage_pct=0.85, country_col="Mapping Country", sort_col="Free Float MCap Y2025"):
-    """Step 7: 85% coverage per country.
-    sort_col: "Adj_FF_MCap" (default per methodology) or "Free Float MCap Y2025" (raw FF MCap).
-    Returns subset of df that passes coverage threshold per country.
-    """
-    results = []
-    country_col = country_col if country_col in df_candidates.columns else "Exchange Country Name"
-    if sort_col not in df_candidates.columns:
-        sort_col = "Free Float MCap Y2025"
-    for country, grp in df_candidates.groupby(country_col):
-        grp = grp.sort_values(sort_col, ascending=False).copy()
-        total = grp[sort_col].sum()
-        if total == 0:
-            continue
-        grp["_cum"] = grp[sort_col].cumsum()
-        grp["_cum_pct"] = grp["_cum"] / total * 100
-        target = coverage_pct * 100
-        cutoff_idx = grp[grp["_cum_pct"] >= target].index
-        if len(cutoff_idx) == 0:
-            results.append(grp)
-        else:
-            results.append(grp.loc[:cutoff_idx[0]])
-    if results:
-        return pd.concat(results, ignore_index=True)
-    return pd.DataFrame(columns=df_candidates.columns)
-
 
 def apply_step8_secondary(df_step7, df_raw_orig, eumss_full, eumss_ff, min_ff_pct,
                            atvr_dm_min, atvr_em_min,
@@ -1227,7 +1107,7 @@ def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Co
     return pd.concat(results, ignore_index=True)
 
 
-def add_step8_secondary_new(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, atvr_em,
+def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, atvr_em,
                              max_price, thailand_mode, china_if, india_if, vietnam_if, saudi_if):
     """Step 8: Add secondary share classes for selected entities."""
     selected_entities = set(df_selected["Entity ID"].dropna().unique())
@@ -1538,7 +1418,7 @@ with tab_gs:
                                 np.where(_gs_sorted["_cum_pct"] <= mid_thr,   "Mid Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= small_thr, "Small Cap", "Micro Cap")))
 
-    _gs_final = add_step8_secondary_new(_gs_sorted, df_raw_original, new_adtv_dm, new_adtv_em,
+    _gs_final = add_secondary_listings(_gs_sorted, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
 
@@ -1571,7 +1451,7 @@ with tab_pc:
     _pc_seg = assign_segments_new(_pc_liq, large_thr, mid_thr, small_thr,
         group_col="Mapping Country", sort_col="Adj_FF_MCap")
 
-    _pc_final = add_step8_secondary_new(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
+    _pc_final = add_secondary_listings(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
 
@@ -1649,7 +1529,7 @@ with tab_gimi:
         _gm_micro["Segment_New"] = "Micro Cap"
 
         # Step 8: Secondaries for standard index only
-        _gm_final = add_step8_secondary_new(_gm_std, df_raw_original, new_adtv_dm, new_adtv_em,
+        _gm_final = add_secondary_listings(_gm_std, df_raw_original, new_adtv_dm, new_adtv_em,
             new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
             china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
 
