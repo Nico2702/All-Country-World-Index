@@ -863,10 +863,10 @@ with tab_acwi:
 <div class="info-box">
 <b>Selektionskriterien</b><br>
 Listing: All (Primary + Secondary) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; DM: Global Sort V1 &nbsp;|&nbsp; EM: Threshold {em_threshold_pct:.1f}%<br>
-EM Min MCap: ≥ {em_threshold_pct:.1f}% × DM Grenzstock ({format_bn(_cutoff_v1['Total MCap Y2025'])}) = {format_bn(_em_min_mcap)}<br>
 ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
 Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
-China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
+Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi {saudi_inclusion_factor*100:.0f}%<br>
+<br>EM Min MCap: ≥ {em_threshold_pct:.1f}% × DM Grenzstock ({format_bn(_cutoff_v1['Total MCap Y2025'])}) = {format_bn(_em_min_mcap)}
 </div>
 """, unsafe_allow_html=True)
         with st.expander("🔍 Pipeline Diagnostik", expanded=False):
@@ -1229,7 +1229,7 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
 Listing: {params_dict.get('Listing','—')} &nbsp;|&nbsp; Filter: {params_dict.get('Filter','—')} &nbsp;|&nbsp; IF: {if_mode}<br>
 ADTV DM: {adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {atvr_em*100:.0f}%<br>
 Large: {large_pct}% &nbsp;|&nbsp; Mid: {mid_pct}% &nbsp;|&nbsp; Small: {small_pct}% &nbsp;|&nbsp; Min FF: {min_ff*100:.0f}%<br>
-China IF: {china_if*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_if*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_if*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_if*100:.0f}%{_eumss_line}
+Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.0f}% &nbsp;|&nbsp; Vietnam {vietnam_if*100:.0f}% &nbsp;|&nbsp; Saudi {saudi_if*100:.0f}%{("<br><br>" + _eumss_line[4:]) if _eumss_line else ""}
 </div>
 """, unsafe_allow_html=True)
         with st.expander("🔍 Pipeline Diagnostik", expanded=False):
