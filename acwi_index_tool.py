@@ -843,7 +843,7 @@ with tab_acwi:
     if _cutoff_v1 is not None:
         _cutoff_mcap = _cutoff_v1["Total MCap Y2025"]
         _em_min_mcap = _cutoff_mcap * (em_threshold_pct / 100)
-        df_acwi_dm = _seg_dm_v1[_seg_dm_v1["Status"] == "Included"].copy()
+        df_acwi_dm = _seg_dm_v1[_seg_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])].copy()
         df_acwi_em = filter_em_by_threshold(_df_em_post, _cutoff_mcap, em_threshold_pct / 100)
         df_acwi_em = apply_post_filter(df_acwi_em)
 
