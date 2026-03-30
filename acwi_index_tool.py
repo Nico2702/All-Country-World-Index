@@ -798,25 +798,25 @@ with tab_overview:
     # Country breakdown
     _ov_col1, _ov_col2 = st.columns(2)
     with _ov_col1:
-        _dm_ct_ov = _ov_dm.groupby("Exchange Country Name").agg(
+        _dm_ct_ov = _ov_dm.groupby("Mapping Country").agg(
             Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
         _dm_ct_ov["FF MCap (USD)"] = _dm_ct_ov["FF_MCap"].apply(format_bn)
         _dm_ct_ov["Avg MCap"]      = _dm_ct_ov["Avg_MCap"].apply(format_bn)
         _dm_ct_ov["Share (%)"]     = (_dm_ct_ov["FF_MCap"]/_dm_ct_ov["FF_MCap"].sum()*100).round(2)
         st.markdown(f"**DM Universe — {len(_ov_dm):,} Stocks**")
-        st.dataframe(_dm_ct_ov[["Exchange Country Name","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]],
+        st.dataframe(_dm_ct_ov[["Mapping Country","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]].rename(columns={"Mapping Country":"Land"}),
             use_container_width=True, height=400, hide_index=True)
 
     with _ov_col2:
-        _em_ct_ov = _ov_em.groupby("Exchange Country Name").agg(
+        _em_ct_ov = _ov_em.groupby("Mapping Country").agg(
             Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
             Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
         _em_ct_ov["FF MCap (USD)"] = _em_ct_ov["FF_MCap"].apply(format_bn)
         _em_ct_ov["Avg MCap"]      = _em_ct_ov["Avg_MCap"].apply(format_bn)
         _em_ct_ov["Share (%)"]     = (_em_ct_ov["FF_MCap"]/_em_ct_ov["FF_MCap"].sum()*100).round(2)
         st.markdown(f"**EM Universe — {len(_ov_em):,} Stocks**")
-        st.dataframe(_em_ct_ov[["Exchange Country Name","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]],
+        st.dataframe(_em_ct_ov[["Mapping Country","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]].rename(columns={"Mapping Country":"Land"}),
             use_container_width=True, height=400, hide_index=True)
 
     # Treemap
