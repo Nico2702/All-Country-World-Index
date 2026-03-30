@@ -803,7 +803,7 @@ with tab_overview:
             Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
         _dm_ct_ov["FF MCap (USD)"] = _dm_ct_ov["FF_MCap"].apply(format_bn)
         _dm_ct_ov["Avg MCap"]      = _dm_ct_ov["Avg_MCap"].apply(format_bn)
-        _dm_ct_ov["Share (%)"]     = (_dm_ct_ov["FF_MCap"]/_dm_ct_ov["FF_MCap"].sum()*100).round(2)
+        _dm_ct_ov["Share (%)"]     = (_dm_ct_ov["FF_MCap"]/_dm_ct_ov["FF_MCap"].sum()*100).apply(lambda x: f"{x:.2f}%")
         st.markdown(f"**DM Universe — {len(_ov_dm):,} Stocks**")
         st.dataframe(_dm_ct_ov[["Mapping Country","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]].rename(columns={"Mapping Country":"Land"}),
             use_container_width=True, height=400, hide_index=True)
@@ -814,7 +814,7 @@ with tab_overview:
             Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
         _em_ct_ov["FF MCap (USD)"] = _em_ct_ov["FF_MCap"].apply(format_bn)
         _em_ct_ov["Avg MCap"]      = _em_ct_ov["Avg_MCap"].apply(format_bn)
-        _em_ct_ov["Share (%)"]     = (_em_ct_ov["FF_MCap"]/_em_ct_ov["FF_MCap"].sum()*100).round(2)
+        _em_ct_ov["Share (%)"]     = (_em_ct_ov["FF_MCap"]/_em_ct_ov["FF_MCap"].sum()*100).apply(lambda x: f"{x:.2f}%")
         st.markdown(f"**EM Universe — {len(_ov_em):,} Stocks**")
         st.dataframe(_em_ct_ov[["Mapping Country","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]].rename(columns={"Mapping Country":"Land"}),
             use_container_width=True, height=400, hide_index=True)
@@ -1386,7 +1386,7 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
         ).reset_index().sort_values("Adj_MCap", ascending=False)
         ct["FF MCap"] = ct["FF_MCap"].apply(format_bn)
         ct["Avg MCap"] = ct["Avg_MCap"].apply(format_bn)
-        ct["Weight %"] = (ct["Adj_MCap"]/total_adj*100).round(2)
+        ct["Weight %"] = (ct["Adj_MCap"]/total_adj*100).apply(lambda x: f"{x:.2f}%")
         return ct[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"})
 
     with _cc1:
