@@ -1189,7 +1189,10 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
 
 def render_new_tab(tab_name, df_included, large_pct, mid_pct,
                    china_if, india_if, vietnam_if, saudi_if,
-                   params_dict):
+                   params_dict,
+                   diag_rows=None, diag_caption=None,
+                   adtv_dm=0, adtv_em=0, atvr_dm=0, atvr_em=0,
+                   small_pct=99, min_ff=0.15, if_mode="Selektion"):
     """Render standard visuals for a new index tab."""
 
     df_dm = df_included[df_included["Classification"]=="DM"].copy()
@@ -1213,6 +1216,27 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
     m5.metric("EM FF MCap",      format_bn(_acwi_em["Free Float MCap Y2025"].sum()))
     m6.metric("EM Adj. FF MCap", format_bn(em_adj))
     m7.metric("EM Adj. Weight",  f"{em_w:.2f}%")
+
+    # ── Selektionskriterien + Pipeline Diagnostik ────────────────────────────
+    if diag_rows is not None:
+        _eumss_line = ""
+        if diag_caption and "EUMSS_FULL" in diag_caption:
+            _parts = [p.strip() for p in diag_caption.split("|") if any(k in p for k in ["EUMSS_FULL","EUMSS_FF","FF Ratio"])]
+            if _parts:
+                _eumss_line = "<br>" + " &nbsp;|&nbsp; ".join(_parts)
+        st.markdown(f"""
+<div class="info-box">
+<b>Selektionskriterien</b><br>
+Listing: {params_dict.get('Listing','—')} &nbsp;|&nbsp; Filter: {params_dict.get('Filter','—')} &nbsp;|&nbsp; IF: {if_mode}<br>
+ADTV DM: {adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {atvr_em*100:.0f}%<br>
+Large: {large_pct}% &nbsp;|&nbsp; Mid: {mid_pct}% &nbsp;|&nbsp; Small: {small_pct}% &nbsp;|&nbsp; Min FF: {min_ff*100:.0f}%<br>
+China IF: {china_if*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_if*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_if*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_if*100:.0f}%{_eumss_line}
+</div>
+""", unsafe_allow_html=True)
+        with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+            st.dataframe(pd.DataFrame(diag_rows), use_container_width=True, hide_index=True)
+            if diag_caption:
+                st.caption(diag_caption)
 
     # ── 5 Index Products ─────────────────────────────────────────────────────
     st.markdown("---")
@@ -1461,27 +1485,14 @@ with tab_gs:
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
-    # Pipeline Diagnostik
     _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
-    st.markdown(f"""
-<div class="info-box">
-<b>Selektionskriterien</b><br>
-Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; IF: {if_selection_mode}<br>
-ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
-Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
-China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
-</div>
-""", unsafe_allow_html=True)
-    with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-        _gs_diag = [
-            {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gs_all["Classification"]=="DM").sum(),"EM":(_gs_all["Classification"]=="EM").sum(),"Total":len(_gs_all),"Δ":"—"},
-            {"Schritt":"1 — Universe (Primary only)","DM":(_gs_u["Classification"]=="DM").sum(),"EM":(_gs_u["Classification"]=="EM").sum(),"Total":len(_gs_u),"Δ":f"-{len(_gs_all)-len(_gs_u):,}"},
-            {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_gs_liq["Classification"]=="DM").sum(),"EM":(_gs_liq["Classification"]=="EM").sum(),"Total":len(_gs_liq),"Δ":f"-{len(_gs_u)-len(_gs_liq):,}"},
-            {"Schritt":"3 — Segmentierung (Global Sort)","DM":(_gs_sorted["Classification"]=="DM").sum(),"EM":(_gs_sorted["Classification"]=="EM").sum(),"Total":len(_gs_sorted),"Δ":"—"},
-            {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_gs_final["Classification"]=="DM").sum(),"EM":(_gs_final["Classification"]=="EM").sum(),"Total":len(_gs_final),"Δ":f"+{len(_gs_final)-len(_gs_sorted):,}"},
-        ]
-        st.dataframe(pd.DataFrame(_gs_diag), use_container_width=True, hide_index=True)
-        st.caption(f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}")
+    _gs_diag = [
+        {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gs_all["Classification"]=="DM").sum(),"EM":(_gs_all["Classification"]=="EM").sum(),"Total":len(_gs_all),"Δ":"—"},
+        {"Schritt":"1 — Universe (Primary only)","DM":(_gs_u["Classification"]=="DM").sum(),"EM":(_gs_u["Classification"]=="EM").sum(),"Total":len(_gs_u),"Δ":f"-{len(_gs_all)-len(_gs_u):,}"},
+        {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_gs_liq["Classification"]=="DM").sum(),"EM":(_gs_liq["Classification"]=="EM").sum(),"Total":len(_gs_liq),"Δ":f"-{len(_gs_u)-len(_gs_liq):,}"},
+        {"Schritt":"3 — Segmentierung (Global Sort)","DM":(_gs_sorted["Classification"]=="DM").sum(),"EM":(_gs_sorted["Classification"]=="EM").sum(),"Total":len(_gs_sorted),"Δ":"—"},
+        {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_gs_final["Classification"]=="DM").sum(),"EM":(_gs_final["Classification"]=="EM").sum(),"Total":len(_gs_final),"Δ":f"+{len(_gs_final)-len(_gs_sorted):,}"},
+    ]
 
     _gs_params = {"Methodik":"Global Sort (Threshold)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
@@ -1490,7 +1501,11 @@ China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_incl
         "Max Price (USD)":f"{max_closing_price:,.0f}" if max_closing_price else "—"}
 
     render_new_tab("Global Sort", _gs_final, large_thr, mid_thr,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor, _gs_params)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        _gs_params, diag_rows=_gs_diag,
+        diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
+        adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
+        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1516,27 +1531,14 @@ with tab_pc:
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
 
-    # Pipeline Diagnostik
     _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
-    st.markdown(f"""
-<div class="info-box">
-<b>Selektionskriterien</b><br>
-Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; IF: {if_selection_mode}<br>
-ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
-Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
-China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
-</div>
-""", unsafe_allow_html=True)
-    with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-        _pc_diag = [
-            {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_pc_all["Classification"]=="DM").sum(),"EM":(_pc_all["Classification"]=="EM").sum(),"Total":len(_pc_all),"Δ":"—"},
-            {"Schritt":"1 — Universe (Primary only)","DM":(_pc_u["Classification"]=="DM").sum(),"EM":(_pc_u["Classification"]=="EM").sum(),"Total":len(_pc_u),"Δ":f"-{len(_pc_all)-len(_pc_u):,}"},
-            {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_pc_liq["Classification"]=="DM").sum(),"EM":(_pc_liq["Classification"]=="EM").sum(),"Total":len(_pc_liq),"Δ":f"-{len(_pc_u)-len(_pc_liq):,}"},
-            {"Schritt":"3 — Segmentierung (per Mapping Country)","DM":(_pc_seg["Classification"]=="DM").sum(),"EM":(_pc_seg["Classification"]=="EM").sum(),"Total":len(_pc_seg),"Δ":"—"},
-            {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_pc_final["Classification"]=="DM").sum(),"EM":(_pc_final["Classification"]=="EM").sum(),"Total":len(_pc_final),"Δ":f"+{len(_pc_final)-len(_pc_seg):,}"},
-        ]
-        st.dataframe(pd.DataFrame(_pc_diag), use_container_width=True, hide_index=True)
-        st.caption(f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}")
+    _pc_diag = [
+        {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_pc_all["Classification"]=="DM").sum(),"EM":(_pc_all["Classification"]=="EM").sum(),"Total":len(_pc_all),"Δ":"—"},
+        {"Schritt":"1 — Universe (Primary only)","DM":(_pc_u["Classification"]=="DM").sum(),"EM":(_pc_u["Classification"]=="EM").sum(),"Total":len(_pc_u),"Δ":f"-{len(_pc_all)-len(_pc_u):,}"},
+        {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_pc_liq["Classification"]=="DM").sum(),"EM":(_pc_liq["Classification"]=="EM").sum(),"Total":len(_pc_liq),"Δ":f"-{len(_pc_u)-len(_pc_liq):,}"},
+        {"Schritt":"3 — Segmentierung (per Mapping Country)","DM":(_pc_seg["Classification"]=="DM").sum(),"EM":(_pc_seg["Classification"]=="EM").sum(),"Total":len(_pc_seg),"Δ":"—"},
+        {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_pc_final["Classification"]=="DM").sum(),"EM":(_pc_final["Classification"]=="EM").sum(),"Total":len(_pc_final),"Δ":f"+{len(_pc_final)-len(_pc_seg):,}"},
+    ]
 
     _pc_params = {"Methodik":"Per Country (Solactive)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
@@ -1545,7 +1547,11 @@ China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_incl
         "Max Price (USD)":f"{max_closing_price:,.0f}" if max_closing_price else "—"}
 
     render_new_tab("Per Country (Solactive)", _pc_final, large_thr, mid_thr,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor, _pc_params)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        _pc_params, diag_rows=_pc_diag,
+        diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
+        adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
+        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1619,29 +1625,17 @@ with tab_gimi:
         _gm_tot_adj = _gm_complete["Adj_FF_MCap"].sum()
         _gm_complete["Index_Weight"] = _gm_complete["Adj_FF_MCap"]/_gm_tot_adj*100 if _gm_tot_adj>0 else 0
 
-        # Pipeline Diagnostik
         _gm_all = df_raw_all[df_raw_all["Classification"].notna()]
-        st.markdown(f"""
-<div class="info-box">
-<b>Selektionskriterien</b><br>
-Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Pre &nbsp;|&nbsp; IF: {if_selection_mode}<br>
-ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
-Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
-China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%<br>
-EUMSS_FULL: {format_bn(_gm_eumss_full)} &nbsp;|&nbsp; EUMSS_FF: {format_bn(_gm_eumss_ff)} &nbsp;|&nbsp; FF Ratio: {new_eumss_ff_ratio*100:.0f}%
-</div>
-""", unsafe_allow_html=True)
-        with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-            _gm_diag = [
-                {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gm_all["Classification"]=="DM").sum(),"EM":(_gm_all["Classification"]=="EM").sum(),"Total":len(_gm_all),"Δ":"—"},
-                {"Schritt":"1 — Universe (Primary only)","DM":(_gm_u["Classification"]=="DM").sum(),"EM":(_gm_u["Classification"]=="EM").sum(),"Total":len(_gm_u),"Δ":f"-{len(_gm_all)-len(_gm_u):,}"},
-                {"Schritt":f"2 — EUMSS Filter ({_gm_eumss_full/1e6:.0f}M)","DM":(_gm_eumss["Classification"]=="DM").sum(),"EM":(_gm_eumss["Classification"]=="EM").sum(),"Total":len(_gm_eumss),"Δ":f"-{len(_gm_u)-len(_gm_eumss):,}"},
-                {"Schritt":"3 — Liquiditätsfilter (Pre)","DM":(_gm_liq["Classification"]=="DM").sum(),"EM":(_gm_liq["Classification"]=="EM").sum(),"Total":len(_gm_liq),"Δ":f"-{len(_gm_eumss)-len(_gm_liq):,}"},
-                {"Schritt":f"4 — {mid_thr}% Coverage","DM":(_gm_std["Classification"]=="DM").sum(),"EM":(_gm_std["Classification"]=="EM").sum(),"Total":len(_gm_std),"Δ":f"-{len(_gm_liq)-len(_gm_std):,}"},
-                {"Schritt":"5 — Secondary Listings re-added (+)","DM":(_gm_final["Classification"]=="DM").sum(),"EM":(_gm_final["Classification"]=="EM").sum(),"Total":len(_gm_final),"Δ":f"+{len(_gm_final)-len(_gm_std):,}"},
-            ]
-            st.dataframe(pd.DataFrame(_gm_diag), use_container_width=True, hide_index=True)
-            st.caption(f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}% | Min FF%: {min_ff_pct*100:.0f}% | IF Anwendung: {if_selection_mode}")
+        _gm_diag = [
+            {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gm_all["Classification"]=="DM").sum(),"EM":(_gm_all["Classification"]=="EM").sum(),"Total":len(_gm_all),"Δ":"—"},
+            {"Schritt":"1 — Universe (Primary only)","DM":(_gm_u["Classification"]=="DM").sum(),"EM":(_gm_u["Classification"]=="EM").sum(),"Total":len(_gm_u),"Δ":f"-{len(_gm_all)-len(_gm_u):,}"},
+            {"Schritt":f"2 — EUMSS Filter ({_gm_eumss_full/1e6:.0f}M)","DM":(_gm_eumss["Classification"]=="DM").sum(),"EM":(_gm_eumss["Classification"]=="EM").sum(),"Total":len(_gm_eumss),"Δ":f"-{len(_gm_u)-len(_gm_eumss):,}"},
+            {"Schritt":"3 — Liquiditätsfilter (Pre)","DM":(_gm_liq["Classification"]=="DM").sum(),"EM":(_gm_liq["Classification"]=="EM").sum(),"Total":len(_gm_liq),"Δ":f"-{len(_gm_eumss)-len(_gm_liq):,}"},
+            {"Schritt":f"4 — {mid_thr}% Coverage","DM":(_gm_std["Classification"]=="DM").sum(),"EM":(_gm_std["Classification"]=="EM").sum(),"Total":len(_gm_std),"Δ":f"-{len(_gm_liq)-len(_gm_std):,}"},
+            {"Schritt":"5 — Secondary Listings re-added (+)","DM":(_gm_final["Classification"]=="DM").sum(),"EM":(_gm_final["Classification"]=="EM").sum(),"Total":len(_gm_final),"Δ":f"+{len(_gm_final)-len(_gm_std):,}"},
+        ]
+        _gm_diag_caption = f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}% | Min FF%: {min_ff_pct*100:.0f}% | IF: {if_selection_mode}"
+        _gm_eumss_extra = f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}%"
 
         _gm_params = {"Methodik":"GIMI Method","Listing":"Primary only + Secondary Listings (re-added)",
             "Filter":"Pre (nach EUMSS)","EUMSS Kalibrierung (%)":f"{small_thr}%",
@@ -1653,7 +1647,11 @@ EUMSS_FULL: {format_bn(_gm_eumss_full)} &nbsp;|&nbsp; EUMSS_FF: {format_bn(_gm_e
             "Max Price (USD)":f"{max_closing_price:,.0f}" if max_closing_price else "—"}
 
         render_new_tab("GIMI Method", _gm_complete, large_thr, mid_thr,
-            china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor, _gm_params)
+            china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+            _gm_params, diag_rows=_gm_diag,
+            diag_caption=_gm_diag_caption,
+            adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
+            small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
     else:
         st.error("Keine DM Stocks gefunden.")
 
