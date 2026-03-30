@@ -998,56 +998,56 @@ with tab_acwi:
         _ccol1, _ccol2 = st.columns(2)
         with _ccol1:
             st.markdown(f"**DM — Country Breakdown ({len(df_acwi_dm):,} Stocks)**")
-            _dm_ct = df_acwi_dm.groupby("Exchange Country Name").agg(
+            _dm_ct = df_acwi_dm.groupby("Mapping Country").agg(
                 Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
                 Adj=("Adjusted FF MCap","sum"), Avg=("Total MCap Y2025","mean")).reset_index()
             _dm_ct["FF MCap"] = _dm_ct["FF_MCap"].apply(format_bn)
             _dm_ct["Avg MCap"] = _dm_ct["Avg"].apply(format_bn)
             _dm_ct["Weight %"] = (_dm_ct["Adj"]/_total_adj_acwi*100).round(2)
-            st.dataframe(_dm_ct.sort_values("Adj",ascending=False)[["Exchange Country Name","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Exchange Country Name":"Land"}),
+            st.dataframe(_dm_ct.sort_values("Adj",ascending=False)[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"}),
                 use_container_width=True, hide_index=True)
         with _ccol2:
             st.markdown(f"**EM — Country Breakdown ({len(df_acwi_em):,} Stocks)**")
-            _em_ct = df_acwi_em.groupby("Exchange Country Name").agg(
+            _em_ct = df_acwi_em.groupby("Mapping Country").agg(
                 Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
                 Adj=("Adjusted FF MCap","sum"), Avg=("Total MCap Y2025","mean")).reset_index()
             _em_ct["FF MCap"] = _em_ct["FF_MCap"].apply(format_bn)
             _em_ct["Avg MCap"] = _em_ct["Avg"].apply(format_bn)
             _em_ct["Weight %"] = (_em_ct["Adj"]/_total_adj_acwi*100).round(2)
-            st.dataframe(_em_ct.sort_values("Adj",ascending=False)[["Exchange Country Name","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Exchange Country Name":"Land"}),
+            st.dataframe(_em_ct.sort_values("Adj",ascending=False)[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"}),
                 use_container_width=True, hide_index=True)
 
         # Country Charts
         _acwi_all2 = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
         _total_adj2 = _acwi_all2["Adjusted FF MCap"].sum()
-        _by_w2 = _acwi_all2.groupby("Exchange Country Name").agg(
+        _by_w2 = _acwi_all2.groupby("Mapping Country").agg(
             Stocks=("Symbol","count"), Adj=("Adjusted FF MCap","sum")).reset_index()
         _by_w2["Weight%"] = (_by_w2["Adj"]/_total_adj2*100).round(2)
         _top30 = _by_w2.sort_values("Adj",ascending=False).head(30)
         _rest2 = _by_w2.sort_values("Adj",ascending=False).iloc[30:]
         if len(_rest2):
-            _top30 = pd.concat([pd.DataFrame([{"Exchange Country Name":f"Others ({len(_rest2)})","Stocks":_rest2["Stocks"].sum(),"Adj":_rest2["Adj"].sum(),"Weight%":_rest2["Weight%"].sum()}]),_top30])
+            _top30 = pd.concat([pd.DataFrame([{"Mapping Country":f"Others ({len(_rest2)})","Stocks":_rest2["Stocks"].sum(),"Adj":_rest2["Adj"].sum(),"Weight%":_rest2["Weight%"].sum()}]),_top30])
         _top30 = _top30.sort_values("Adj",ascending=True)
 
-        _by_s2 = _acwi_all2.groupby("Exchange Country Name").agg(Stocks=("Symbol","count")).reset_index()
+        _by_s2 = _acwi_all2.groupby("Mapping Country").agg(Stocks=("Symbol","count")).reset_index()
         _by_s2["Pct"] = (_by_s2["Stocks"]/len(_acwi_all2)*100).round(2)
         _tops = _by_s2.sort_values("Stocks",ascending=False).head(30)
         _rests = _by_s2.sort_values("Stocks",ascending=False).iloc[30:]
         if len(_rests):
-            _tops = pd.concat([pd.DataFrame([{"Exchange Country Name":f"Others ({len(_rests)})","Stocks":_rests["Stocks"].sum(),"Pct":_rests["Pct"].sum()}]),_tops])
+            _tops = pd.concat([pd.DataFrame([{"Mapping Country":f"Others ({len(_rests)})","Stocks":_rests["Stocks"].sum(),"Pct":_rests["Pct"].sum()}]),_tops])
         _tops = _tops.sort_values("Stocks",ascending=True)
 
         _ch_col1, _ch_col2 = st.columns(2)
         with _ch_col1:
             st.markdown("**Nach Anzahl Stocks (%)**")
-            fig_s2 = go.Figure(go.Bar(x=_tops["Pct"],y=_tops["Exchange Country Name"],orientation="h",
+            fig_s2 = go.Figure(go.Bar(x=_tops["Pct"],y=_tops["Mapping Country"],orientation="h",
                 marker_color="#2979ff",text=_tops["Pct"].apply(lambda x:f"{x:.2f}%"),textposition="outside"))
             fig_s2.update_layout(template="plotly_dark",paper_bgcolor="#0f1117",plot_bgcolor="#161b27",
                 height=700,margin=dict(t=10,b=10,l=10,r=60),xaxis=dict(showgrid=False))
             st.plotly_chart(fig_s2,use_container_width=True)
         with _ch_col2:
             st.markdown("**Nach Gewicht (Adj. FF MCap %)**")
-            fig_w2 = go.Figure(go.Bar(x=_top30["Weight%"],y=_top30["Exchange Country Name"],orientation="h",
+            fig_w2 = go.Figure(go.Bar(x=_top30["Weight%"],y=_top30["Mapping Country"],orientation="h",
                 marker_color="#ce93d8",text=_top30["Weight%"].apply(lambda x:f"{x:.2f}%"),textposition="outside"))
             fig_w2.update_layout(template="plotly_dark",paper_bgcolor="#0f1117",plot_bgcolor="#161b27",
                 height=700,margin=dict(t=10,b=10,l=10,r=60),xaxis=dict(showgrid=False))
