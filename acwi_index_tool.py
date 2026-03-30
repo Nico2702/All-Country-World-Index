@@ -1436,6 +1436,19 @@ with tab_gs:
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
+    # Pipeline Diagnostik
+    with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+        _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
+        _gs_diag = [
+            {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gs_all["Classification"]=="DM").sum(),"EM":(_gs_all["Classification"]=="EM").sum(),"Total":len(_gs_all),"Δ":"—"},
+            {"Schritt":"1 — Universe (Primary only)","DM":(_gs_u["Classification"]=="DM").sum(),"EM":(_gs_u["Classification"]=="EM").sum(),"Total":len(_gs_u),"Δ":f"-{len(_gs_all)-len(_gs_u):,}"},
+            {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_gs_liq["Classification"]=="DM").sum(),"EM":(_gs_liq["Classification"]=="EM").sum(),"Total":len(_gs_liq),"Δ":f"-{len(_gs_u)-len(_gs_liq):,}"},
+            {"Schritt":"3 — Segmentierung (Global Sort)","DM":(_gs_sorted["Classification"]=="DM").sum(),"EM":(_gs_sorted["Classification"]=="EM").sum(),"Total":len(_gs_sorted),"Δ":"—"},
+            {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_gs_final["Classification"]=="DM").sum(),"EM":(_gs_final["Classification"]=="EM").sum(),"Total":len(_gs_final),"Δ":f"+{len(_gs_final)-len(_gs_sorted):,}"},
+        ]
+        st.dataframe(pd.DataFrame(_gs_diag), use_container_width=True, hide_index=True)
+        st.caption(f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}")
+
     _gs_params = {"Methodik":"Global Sort (Threshold)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
         "DM ADTV (USD)":f"{new_adtv_dm:,.0f}","EM ADTV (USD)":f"{new_adtv_em:,.0f}",
@@ -1468,6 +1481,19 @@ with tab_pc:
 
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
+
+    # Pipeline Diagnostik
+    with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+        _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
+        _pc_diag = [
+            {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_pc_all["Classification"]=="DM").sum(),"EM":(_pc_all["Classification"]=="EM").sum(),"Total":len(_pc_all),"Δ":"—"},
+            {"Schritt":"1 — Universe (Primary only)","DM":(_pc_u["Classification"]=="DM").sum(),"EM":(_pc_u["Classification"]=="EM").sum(),"Total":len(_pc_u),"Δ":f"-{len(_pc_all)-len(_pc_u):,}"},
+            {"Schritt":"2 — Liquiditätsfilter (Post)","DM":(_pc_liq["Classification"]=="DM").sum(),"EM":(_pc_liq["Classification"]=="EM").sum(),"Total":len(_pc_liq),"Δ":f"-{len(_pc_u)-len(_pc_liq):,}"},
+            {"Schritt":"3 — Segmentierung (per Mapping Country)","DM":(_pc_seg["Classification"]=="DM").sum(),"EM":(_pc_seg["Classification"]=="EM").sum(),"Total":len(_pc_seg),"Δ":"—"},
+            {"Schritt":"4 — Secondary Listings re-added (+)","DM":(_pc_final["Classification"]=="DM").sum(),"EM":(_pc_final["Classification"]=="EM").sum(),"Total":len(_pc_final),"Δ":f"+{len(_pc_final)-len(_pc_seg):,}"},
+        ]
+        st.dataframe(pd.DataFrame(_pc_diag), use_container_width=True, hide_index=True)
+        st.caption(f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}")
 
     _pc_params = {"Methodik":"Per Country (Solactive)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
@@ -1552,15 +1578,17 @@ with tab_gimi:
 
         # Pipeline Diagnostik
         with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+            _gm_all = df_raw_all[df_raw_all["Classification"].notna()]
             _gm_diag = [
-                {"Schritt":"1 — Universe (Primary only)","DM":(_gm_u["Classification"]=="DM").sum(),"EM":(_gm_u["Classification"]=="EM").sum(),"Total":len(_gm_u),"Exkl.":"—"},
-                {"Schritt":f"2 — EUMSS Filter ({_gm_eumss_full/1e6:.0f}M)","DM":(_gm_eumss["Classification"]=="DM").sum(),"EM":(_gm_eumss["Classification"]=="EM").sum(),"Total":len(_gm_eumss),"Exkl.":f"-{len(_gm_u)-len(_gm_eumss):,}"},
-                {"Schritt":"3 — Liquidität (Pre)","DM":(_gm_liq["Classification"]=="DM").sum(),"EM":(_gm_liq["Classification"]=="EM").sum(),"Total":len(_gm_liq),"Exkl.":f"-{len(_gm_eumss)-len(_gm_liq):,}"},
-                {"Schritt":f"4 — {mid_thr}% Coverage","DM":(_gm_std["Classification"]=="DM").sum(),"EM":(_gm_std["Classification"]=="EM").sum(),"Total":len(_gm_std),"Exkl.":f"-{len(_gm_liq)-len(_gm_std):,}"},
-                {"Schritt":"5 — Secondary Listings (+)","DM":(_gm_final["Classification"]=="DM").sum(),"EM":(_gm_final["Classification"]=="EM").sum(),"Total":len(_gm_final),"Exkl.":f"+{len(_gm_final)-len(_gm_std):,}"},
+                {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gm_all["Classification"]=="DM").sum(),"EM":(_gm_all["Classification"]=="EM").sum(),"Total":len(_gm_all),"Δ":"—"},
+                {"Schritt":"1 — Universe (Primary only)","DM":(_gm_u["Classification"]=="DM").sum(),"EM":(_gm_u["Classification"]=="EM").sum(),"Total":len(_gm_u),"Δ":f"-{len(_gm_all)-len(_gm_u):,}"},
+                {"Schritt":f"2 — EUMSS Filter ({_gm_eumss_full/1e6:.0f}M)","DM":(_gm_eumss["Classification"]=="DM").sum(),"EM":(_gm_eumss["Classification"]=="EM").sum(),"Total":len(_gm_eumss),"Δ":f"-{len(_gm_u)-len(_gm_eumss):,}"},
+                {"Schritt":"3 — Liquiditätsfilter (Pre)","DM":(_gm_liq["Classification"]=="DM").sum(),"EM":(_gm_liq["Classification"]=="EM").sum(),"Total":len(_gm_liq),"Δ":f"-{len(_gm_eumss)-len(_gm_liq):,}"},
+                {"Schritt":f"4 — {mid_thr}% Coverage","DM":(_gm_std["Classification"]=="DM").sum(),"EM":(_gm_std["Classification"]=="EM").sum(),"Total":len(_gm_std),"Δ":f"-{len(_gm_liq)-len(_gm_std):,}"},
+                {"Schritt":"5 — Secondary Listings re-added (+)","DM":(_gm_final["Classification"]=="DM").sum(),"EM":(_gm_final["Classification"]=="EM").sum(),"Total":len(_gm_final),"Δ":f"+{len(_gm_final)-len(_gm_std):,}"},
             ]
             st.dataframe(pd.DataFrame(_gm_diag), use_container_width=True, hide_index=True)
-            st.caption(f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}% | Min FF%: {min_ff_pct*100:.0f}%")
+            st.caption(f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}% | Min FF%: {min_ff_pct*100:.0f}% | IF Anwendung: {if_selection_mode}")
 
         _gm_params = {"Methodik":"GIMI Method","Listing":"Primary only + Secondary Listings (re-added)",
             "Filter":"Pre (nach EUMSS)","EUMSS Kalibrierung (%)":f"{small_thr}%",
