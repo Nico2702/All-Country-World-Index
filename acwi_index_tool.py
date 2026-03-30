@@ -1402,7 +1402,7 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_gs:
     st.markdown("## 📊 Global Sort (Threshold)")
-    st.caption("Primary only + Secondary Listings | Post-Liquiditätsfilter | Globale Sortierung nach Total MCap")
+    st.caption("Primary only + Secondary Listings (re-added) | Post-Liquiditätsfilter | Globale Sortierung nach Total MCap")
 
     _gs_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
@@ -1425,7 +1425,7 @@ with tab_gs:
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
-    _gs_params = {"Methodik":"Global Sort (Threshold)","Listing":"Primary only + Secondary Listings",
+    _gs_params = {"Methodik":"Global Sort (Threshold)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
         "DM ADTV (USD)":f"{new_adtv_dm:,.0f}","EM ADTV (USD)":f"{new_adtv_em:,.0f}",
         "DM ATVR (%)":f"{new_atvr_dm*100:.0f}%","EM ATVR (%)":f"{new_atvr_em*100:.0f}%",
@@ -1440,7 +1440,7 @@ with tab_gs:
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_pc:
     st.markdown("## 🗺️ Per Country (Solactive)")
-    st.caption("Primary only + Secondary Listings | Post-Liquiditätsfilter | Sortierung per Mapping Country")
+    st.caption("Primary only + Secondary Listings (re-added) | Post-Liquiditätsfilter | Sortierung per Mapping Country")
 
     _pc_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
@@ -1458,7 +1458,7 @@ with tab_pc:
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
 
-    _pc_params = {"Methodik":"Per Country (Solactive)","Listing":"Primary only + Secondary Listings",
+    _pc_params = {"Methodik":"Per Country (Solactive)","Listing":"Primary only + Secondary Listings (re-added)",
         "Filter":"Post","Large Cap (%)":large_thr,"Mid Cap (%)":mid_thr,"Small Cap (%)":small_thr,
         "DM ADTV (USD)":f"{new_adtv_dm:,.0f}","EM ADTV (USD)":f"{new_adtv_em:,.0f}",
         "DM ATVR (%)":f"{new_atvr_dm*100:.0f}%","EM ATVR (%)":f"{new_atvr_em*100:.0f}%",
@@ -1473,7 +1473,7 @@ with tab_pc:
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_gimi:
     st.markdown("## ⚡ GIMI Method")
-    st.caption("Primary only + Secondary Listings | EUMSS Pre-Filter | Liquidität Pre-Filter | Coverage per Land auf Adj_FF_MCap")
+    st.caption("Primary only + Secondary Listings (re-added) | EUMSS Pre-Filter | Liquidität Pre-Filter | Coverage per Land auf Adj_FF_MCap")
 
     _gm_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
@@ -1551,7 +1551,7 @@ with tab_gimi:
             st.dataframe(pd.DataFrame(_gm_diag), use_container_width=True, hide_index=True)
             st.caption(f"EUMSS_FULL: {format_bn(_gm_eumss_full)} | EUMSS_FF: {format_bn(_gm_eumss_ff)} | FF Ratio: {new_eumss_ff_ratio*100:.0f}% | Min FF%: {min_ff_pct*100:.0f}%")
 
-        _gm_params = {"Methodik":"GIMI Method","Listing":"Primary only + Secondary Listings",
+        _gm_params = {"Methodik":"GIMI Method","Listing":"Primary only + Secondary Listings (re-added)",
             "Filter":"Pre (nach EUMSS)","EUMSS Kalibrierung (%)":f"{small_thr}%",
             "EUMSS_FULL (USD)":format_bn(_gm_eumss_full),"EUMSS FF Ratio (%)":f"{new_eumss_ff_ratio*100:.0f}%",
             "EUMSS_FF (USD)":format_bn(_gm_eumss_ff),"Min FF%":f"{min_ff_pct*100:.0f}%",
