@@ -830,6 +830,105 @@ with tab_overview:
     _ov_fig.update_layout(height=500, paper_bgcolor="#0f1117", margin=dict(t=10,b=10,l=10,r=10))
     st.plotly_chart(_ov_fig, use_container_width=True)
 
+    # ── Exclusion Summary ─────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**Exclusion Summary**")
+    st.caption("Sequenziell — jeder Stock wird beim ersten zutreffenden Grund gezählt. Basis: df_raw_original (vor allen Filtern).")
+
+    import re as _re_ov
+    _exc_df = df_raw_original.copy()
+    for _col in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
+                 "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025","Closing Price"]:
+        if _col in _exc_df.columns:
+            _exc_df[_col] = pd.to_numeric(_exc_df[_col], errors="coerce").fillna(0)
+
+    _total_raw = len(_exc_df)
+    _exc_reason = pd.Series([""] * _total_raw, index=_exc_df.index)
+
+    # 1. Thailand Sec Type
+    _th_mask_ov = _exc_df["Exchange Name"].fillna("").str.upper() == "THAILAND"
+    _excl_type_ov = "SHARE" if thailand_sec_type == "NVDR" else "NVDR"
+    _m = _th_mask_ov & (_exc_df["Sec Type"].fillna("") == _excl_type_ov) & (_exc_reason == "")
+    _exc_reason[_m] = f"Thailand Sec Type ({_excl_type_ov} excluded)"
+
+    # 2. FF MCap = 0
+    _m = (_exc_df["Free Float MCap Y2025"] <= 0) & (_exc_reason == "")
+    _exc_reason[_m] = "FF MCap = 0"
+
+    # 3. Max Closing Price
+    if max_closing_price:
+        _m = (_exc_df["Closing Price"].fillna(0) >= max_closing_price) & (_exc_reason == "")
+        _exc_reason[_m] = f"Closing Price ≥ {max_closing_price:,.0f} USD"
+
+    # 4. HK CNY
+    if exclude_hk_cny:
+        _m = (_exc_df["Exchange Ticker"].str.contains("HKG", na=False) &
+              (_exc_df["Trading Currency"] == "CNY")) & (_exc_reason == "")
+        _exc_reason[_m] = "HK CNY (HKG + CNY)"
+
+    # 5. Country of Risk = @NA
+    if exclude_country_risk_na:
+        _m = (_exc_df["Country of Risk"].fillna("") == "@NA") & (_exc_reason == "")
+        _exc_reason[_m] = "Country of Risk = @NA"
+
+    # 6. NAICS Investment Funds
+    if exclude_naics_funds:
+        _m = (_exc_df["NAICS"].fillna("").str.contains("Open-End Investment Fund", case=False, na=False)) & (_exc_reason == "")
+        _exc_reason[_m] = "NAICS: Open-End Investment Fund"
+
+    # 7. Euro MTF / @NA Exchange
+    if exclude_euro_mtf:
+        _m = (_exc_df["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])) & (_exc_reason == "")
+        _exc_reason[_m] = "Exchange: Euro MTF / @NA"
+
+    # 8. ETF / SICAV / %
+    if exclude_etf_sicav:
+        _m = (_exc_df["Name"].fillna("").str.contains(_re_ov.compile(r'\bETF\b|\bSICAV\b|%', _re_ov.IGNORECASE))) & (_exc_reason == "")
+        _exc_reason[_m] = "Name: ETF / SICAV / %"
+
+    # 9. Kein Classification-Mapping
+    _exc_df["_MappingCountry"] = _exc_df.apply(
+        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+                  else r.get("Country of Risk",""), axis=1)
+    _exc_df["_Classification"] = _exc_df["_MappingCountry"].map(country_cls)
+    _m = (_exc_df["_Classification"].isna()) & (_exc_reason == "")
+    _exc_reason[_m] = "Kein DM/EM Mapping"
+
+    _exc_df["_Reason"] = _exc_reason
+
+    # Build summary table
+    _excl_only = _exc_df[_exc_df["_Reason"] != ""]
+    _incl_count = _total_raw - len(_excl_only)
+    _exc_summary = _excl_only.groupby("_Reason").size().reset_index(name="# Stocks")
+    _exc_summary = _exc_summary.sort_values("# Stocks", ascending=False).rename(columns={"_Reason":"Exclusion Grund"})
+    _exc_summary["% Universe"] = (_exc_summary["# Stocks"] / _total_raw * 100).round(2)
+    _total_row = pd.DataFrame([{"Exclusion Grund":"── Total Excluded","# Stocks":len(_excl_only),"% Universe":round(len(_excl_only)/_total_raw*100,2)}])
+    _incl_row  = pd.DataFrame([{"Exclusion Grund":"✅ Verbleibend (inkl. Universe)","# Stocks":_incl_count,"% Universe":round(_incl_count/_total_raw*100,2)}])
+    _exc_summary = pd.concat([_exc_summary, _total_row, _incl_row], ignore_index=True)
+
+    st.dataframe(_exc_summary, use_container_width=True, hide_index=True)
+
+    # ── Ungemappte Länder ─────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**Länder ohne DM/EM Mapping**")
+    st.caption("Stocks die alle Exclusions bestanden haben, aber kein Mapping in Country_Classification.xlsx erhalten haben.")
+
+    _unmapped = _exc_df[(_exc_df["_Reason"] == "Kein DM/EM Mapping")].copy()
+    if len(_unmapped) > 0:
+        _unmap_tbl = _unmapped.groupby("_MappingCountry").agg(
+            Stocks=("Symbol","count"),
+            FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_MCap=("Total MCap Y2025","mean"),
+        ).reset_index().sort_values("Stocks", ascending=False)
+        _unmap_tbl["FF MCap (USD)"] = _unmap_tbl["FF_MCap"].apply(format_bn)
+        _unmap_tbl["Avg MCap (USD)"] = _unmap_tbl["Avg_MCap"].apply(format_bn)
+        st.dataframe(
+            _unmap_tbl[["_MappingCountry","Stocks","FF MCap (USD)","Avg MCap (USD)"]].rename(
+                columns={"_MappingCountry":"Mapping Country"}),
+            use_container_width=True, hide_index=True)
+    else:
+        st.success("Alle Stocks haben ein DM/EM Mapping erhalten.")
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
