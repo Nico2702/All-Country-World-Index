@@ -779,144 +779,56 @@ tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare = st.tabs([
 # TAB 1: Universe Overview
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_overview:
-    col1, col2 = st.columns(2)
+    st.markdown("## 🌍 Universe Overview")
+    st.caption("Rohdaten nach Exclusions und DM/EM Klassifikation — vor Liquiditäts- und Size-Filtern")
 
-    with col1:
-        # DM countries
-        dm_country = df_dm.groupby("Exchange Country Name").agg(
-            Stocks=("Symbol", "count"),
-            FF_MCap=("Free Float MCap Y2025", "sum")
-        ).sort_values("FF_MCap", ascending=False).reset_index()
-        dm_country["FF MCap (USD)"] = dm_country["FF_MCap"].apply(format_bn)
-        dm_country["Share (%)"] = (dm_country["FF_MCap"] / dm_country["FF_MCap"].sum() * 100).round(2)
+    # Use df_raw_all (All listings, after exclusions + classification)
+    _ov_dm = df_dm_full.copy()
+    _ov_em = df_em_full.copy()
+    _ov_all = pd.concat([_ov_dm, _ov_em], ignore_index=True)
 
-        st.markdown("**DM Countries by FF MCap**")
-        st.dataframe(
-            dm_country[["Exchange Country Name", "Stocks", "FF MCap (USD)", "Share (%)"]],
-            use_container_width=True, height=380, hide_index=True
-        )
+    # Top metrics
+    _ov_c1,_ov_c2,_ov_c3,_ov_c4,_ov_c5 = st.columns(5)
+    _ov_c1.metric("Total Stocks",  f"{len(_ov_all):,}")
+    _ov_c2.metric("DM Stocks",     f"{len(_ov_dm):,}")
+    _ov_c3.metric("EM Stocks",     f"{len(_ov_em):,}")
+    _ov_c4.metric("DM FF MCap",    format_bn(_ov_dm["Free Float MCap Y2025"].sum()))
+    _ov_c5.metric("EM FF MCap",    format_bn(_ov_em["Free Float MCap Y2025"].sum()))
 
-    with col2:
-        em_country = df_em.groupby("Exchange Country Name").agg(
-            Stocks=("Symbol", "count"),
-            FF_MCap=("Free Float MCap Y2025", "sum")
-        ).sort_values("FF_MCap", ascending=False).reset_index()
-        em_country["FF MCap (USD)"] = em_country["FF_MCap"].apply(format_bn)
-        em_country["Share (%)"] = (em_country["FF_MCap"] / em_country["FF_MCap"].sum() * 100).round(2)
+    # Country breakdown
+    _ov_col1, _ov_col2 = st.columns(2)
+    with _ov_col1:
+        _dm_ct_ov = _ov_dm.groupby("Exchange Country Name").agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
+        _dm_ct_ov["FF MCap (USD)"] = _dm_ct_ov["FF_MCap"].apply(format_bn)
+        _dm_ct_ov["Avg MCap"]      = _dm_ct_ov["Avg_MCap"].apply(format_bn)
+        _dm_ct_ov["Share (%)"]     = (_dm_ct_ov["FF_MCap"]/_dm_ct_ov["FF_MCap"].sum()*100).round(2)
+        st.markdown(f"**DM Universe — {len(_ov_dm):,} Stocks**")
+        st.dataframe(_dm_ct_ov[["Exchange Country Name","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]],
+            use_container_width=True, height=400, hide_index=True)
 
-        st.markdown("**EM Countries by FF MCap**")
-        st.dataframe(
-            em_country[["Exchange Country Name", "Stocks", "FF MCap (USD)", "Share (%)"]],
-            use_container_width=True, height=380, hide_index=True
-        )
+    with _ov_col2:
+        _em_ct_ov = _ov_em.groupby("Exchange Country Name").agg(
+            Stocks=("Symbol","count"), FF_MCap=("Free Float MCap Y2025","sum"),
+            Avg_MCap=("Total MCap Y2025","mean")).reset_index().sort_values("FF_MCap",ascending=False)
+        _em_ct_ov["FF MCap (USD)"] = _em_ct_ov["FF_MCap"].apply(format_bn)
+        _em_ct_ov["Avg MCap"]      = _em_ct_ov["Avg_MCap"].apply(format_bn)
+        _em_ct_ov["Share (%)"]     = (_em_ct_ov["FF_MCap"]/_em_ct_ov["FF_MCap"].sum()*100).round(2)
+        st.markdown(f"**EM Universe — {len(_ov_em):,} Stocks**")
+        st.dataframe(_em_ct_ov[["Exchange Country Name","Stocks","FF MCap (USD)","Avg MCap","Share (%)"]],
+            use_container_width=True, height=400, hide_index=True)
 
     # Treemap
-    st.markdown("**FF MCap Distribution by Country**")
-    all_country = df_raw.groupby(["Classification","Exchange Country Name"]).agg(
-        FF_MCap=("Free Float MCap Y2025","sum")
-    ).reset_index()
-    fig = px.treemap(
-        all_country, path=["Classification","Exchange Country Name"],
-        values="FF_MCap", color="Classification",
-        color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"},
-        template="plotly_dark",
-    )
-    fig.update_layout(height=450, paper_bgcolor="#0f1117", plot_bgcolor="#0f1117", margin=dict(t=10,b=10,l=10,r=10))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── ADTV Sensitivity Table ───────────────────────────────────────────────
     st.markdown("---")
-    st.markdown("**ADTV Threshold Sensitivity — World Index & ACWI**")
-    st.caption(f"Verwendet: DM {_acwi_variant_g} + EM {_em_method_g}. Alle anderen aktiven Filter bleiben konstant.")
-
-    # DM segments based on selected variant
-    _sens_dm = _seg_dm_v1 if _acwi_variant_g == "Variant 1 (Global / MSCI)" else _seg_dm_v2
-
-    # EM base universe based on selected method
-    _sens_cutoff = _cutoff_v1["Total MCap Y2025"] if _cutoff_v1 is not None else 0
-    if _em_method_g == "Threshold (% des DM Grenzstocks)":
-        _sens_em_df, _ = filter_em_by_threshold(df_em, _sens_cutoff, em_threshold_pct)
-        _sens_em_base_seg = "EM Included"
-    elif _em_method_g == "Global 85% (wie DM Variant 1)":
-        _sens_em_df = _seg_em_g85
-        _sens_em_base_seg = "large_mid"
-    else:  # Per-Country
-        _sens_em_df = filter_em_per_country(df_em, pct=mid_thr)
-        _sens_em_base_seg = "EM Included"
-
-    # Base filters (everything except ADTV)
-    def _base_filter_dm(df):
-        return apply_min_filters(df, dm_ff_gt0, min_ff_pct, max_closing_price,
-                                  0, 0, 0, 0, liq_ratio_min)
-    def _base_filter_em(df):
-        return apply_min_filters(df, em_ff_gt0, min_ff_pct, max_closing_price,
-                                  0, 0, 0, 0, liq_ratio_min)
-
-    # Use sidebar field values directly (ignoring checkbox state)
-    _adtv_periods = {
-        "1M":  ("1M ADTV Y2025",  parse_adtv(st.session_state.get("dm_1m_v2",  "2000000")), parse_adtv(st.session_state.get("em_1m_v2",  "1000000"))),
-        "3M":  ("3M ADTV Y2025",  parse_adtv(st.session_state.get("dm_3m_v2",  "2000000")), parse_adtv(st.session_state.get("em_3m_v2",  "1000000"))),
-        "6M":  ("6M ADTV Y2025",  parse_adtv(st.session_state.get("dm_6m_v2",  "2000000")), parse_adtv(st.session_state.get("em_6m_v2",  "1000000"))),
-        "12M": ("12M ADTV Y2025", parse_adtv(st.session_state.get("dm_12m_v2", "2000000")), parse_adtv(st.session_state.get("em_12m_v2", "1000000"))),
-    }
-    _combos = [
-        ("1M",), ("3M",), ("6M",), ("12M",),
-        ("1M","3M"), ("1M","6M"), ("1M","12M"),
-        ("3M","6M"), ("3M","12M"), ("6M","12M"),
-        ("1M","3M","6M"), ("1M","3M","12M"), ("1M","6M","12M"), ("3M","6M","12M"),
-        ("1M","3M","6M","12M"),
-    ]
-
-    # Pre-compute EM base (before ADTV)
-    if _sens_em_base_seg == "large_mid":
-        _sens_em_base = _base_filter_em(_sens_em_df[_sens_em_df["Segment"].isin(["Large Cap","Mid Cap"])])
-    else:
-        _sens_em_base = _base_filter_em(_sens_em_df[_sens_em_df["Segment"] == "EM Included"])
-
-    _sens_rows = []
-    for combo in _combos:
-        label = " + ".join(combo)
-        _dm_f = _base_filter_dm(_sens_dm[_sens_dm["Segment"].isin(["Large Cap","Mid Cap","Small Cap"])])
-        _em_f = _sens_em_base.copy()
-        for period in combo:
-            col, dm_thr, em_thr = _adtv_periods[period]
-            if dm_thr > 0: _dm_f = _dm_f[_dm_f[col] >= dm_thr]
-            if em_thr > 0: _em_f = _em_f[_em_f[col] >= em_thr]
-
-        _dm_lc = len(_dm_f[_dm_f["Segment"] == "Large Cap"])
-        _dm_mc = len(_dm_f[_dm_f["Segment"] == "Mid Cap"])
-        _wld   = _dm_lc + _dm_mc
-
-        # EM segments based on method
-        if _sens_em_base_seg == "large_mid":
-            # Global 85%: segments already assigned
-            _em_lc = len(_em_f[_em_f["Segment"] == "Large Cap"])
-            _em_mc = len(_em_f[_em_f["Segment"] == "Mid Cap"])
-        else:
-            # Threshold or Per-Country: rank within qualified stocks
-            _em_total_ff = _em_f["Free Float MCap Y2025"].sum()
-            if _em_total_ff > 0 and len(_em_f) > 0:
-                _em_r = _em_f.sort_values("Total MCap Y2025", ascending=False).copy()
-                _em_r["cum_pct"] = _em_r["Free Float MCap Y2025"].cumsum() / _em_total_ff * 100
-                _em_r["EM Seg"] = np.where(_em_r["cum_pct"] <= large_thr, "Large Cap", "Mid Cap")
-                _em_lc = len(_em_r[_em_r["EM Seg"] == "Large Cap"])
-                _em_mc = len(_em_r[_em_r["EM Seg"] == "Mid Cap"])
-            else:
-                _em_lc = _em_mc = 0
-
-        _acwi = _wld + len(_em_f)
-        _sens_rows.append({
-            "ADTV Kombination": label,
-            "DM Large Cap": _dm_lc,
-            "DM Mid Cap":   _dm_mc,
-            "World Index":  _wld,
-            "EM Large Cap": _em_lc,
-            "EM Mid Cap":   _em_mc,
-            "ACWI Index":   _acwi,
-        })
-
-    _sens_df = pd.DataFrame(_sens_rows)
-    st.dataframe(_sens_df, use_container_width=True, hide_index=True, height=575)
+    st.markdown("**FF MCap Verteilung nach Land**")
+    _ov_tree = _ov_all.groupby(["Classification","Mapping Country"]).agg(
+        FF_MCap=("Free Float MCap Y2025","sum")).reset_index()
+    _ov_fig = px.treemap(_ov_tree, path=["Classification","Mapping Country"],
+        values="FF_MCap", color="Classification",
+        color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"}, template="plotly_dark")
+    _ov_fig.update_layout(height=500, paper_bgcolor="#0f1117", margin=dict(t=10,b=10,l=10,r=10))
+    st.plotly_chart(_ov_fig, use_container_width=True)
 
 
 
