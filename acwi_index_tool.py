@@ -1249,29 +1249,40 @@ Inclusion Factor: China {china_if*100:.0f}% &nbsp;|&nbsp; Indien {india_if*100:.
         {"Index": "🌍 World Index",  "DM": len(_world_dm), "EM": "—", "Total": len(_world_dm),
          "DM FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()),
          "EM FF MCap": "—", "EM Adj. FF MCap": "—",
+         "Total FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()),
          "Adj. Weight DM": f"{_world_dm['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—"},
         {"Index": "🌏 EM Index",     "DM": "—", "EM": len(_world_em), "Total": len(_world_em),
          "DM FF MCap": "—",
          "EM FF MCap": format_bn(_world_em["Free Float MCap Y2025"].sum()),
          "EM Adj. FF MCap": format_bn(_world_em["Adj_FF_MCap"].sum()),
+         "Total FF MCap": format_bn(_world_em["Adj_FF_MCap"].sum()),
          "Adj. Weight DM": f"{_world_em['Adj_FF_MCap'].sum()/total_adj*100:.2f}%" if total_adj>0 else "—"},
         {"Index": "🌐 ACWI Index",   "DM": len(_world_dm), "EM": len(_world_em), "Total": len(_world_dm)+len(_world_em),
          "DM FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()),
          "EM FF MCap": format_bn(_world_em["Free Float MCap Y2025"].sum()),
          "EM Adj. FF MCap": format_bn(_world_em["Adj_FF_MCap"].sum()),
+         "Total FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()+_world_em["Adj_FF_MCap"].sum()),
          "Adj. Weight DM": "100.00%"},
         {"Index": "🌍+ World IMI",   "DM": len(_world_dm)+len(_imi_dm_s), "EM": "—", "Total": len(_world_dm)+len(_imi_dm_s),
          "DM FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()+_imi_dm_s["Free Float MCap Y2025"].sum()),
          "EM FF MCap": "—", "EM Adj. FF MCap": "—",
+         "Total FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()+_imi_dm_s["Free Float MCap Y2025"].sum()),
          "Adj. Weight DM": "—"},
         {"Index": "🌐+ ACWI IMI",    "DM": len(_world_dm)+len(_imi_dm_s), "EM": len(_world_em)+len(_imi_em_s),
          "Total": len(_world_dm)+len(_imi_dm_s)+len(_world_em)+len(_imi_em_s),
-         "DM FF MCap": "—",
+         "DM FF MCap": format_bn(_world_dm["Free Float MCap Y2025"].sum()+_imi_dm_s["Free Float MCap Y2025"].sum()),
          "EM FF MCap": format_bn(_world_em["Free Float MCap Y2025"].sum()+_imi_em_s["Free Float MCap Y2025"].sum()),
          "EM Adj. FF MCap": format_bn(_world_em["Adj_FF_MCap"].sum()+_imi_em_s["Adj_FF_MCap"].sum()),
+         "Total FF MCap": format_bn((_world_dm["Free Float MCap Y2025"].sum()+_imi_dm_s["Free Float MCap Y2025"].sum())+(_world_em["Adj_FF_MCap"].sum()+_imi_em_s["Adj_FF_MCap"].sum())),
          "Adj. Weight DM": "—"},
     ]
-    st.dataframe(pd.DataFrame(_idx_rows), use_container_width=True, hide_index=True)
+    _idx_df = pd.DataFrame(_idx_rows)
+    def _style_idx(df):
+        def rs(row):
+            if "ACWI Index" in str(row["Index"]): return ["background-color:#1a3a5c;font-weight:700;"]*len(row)
+            return [""]*len(row)
+        return df.style.apply(rs, axis=1)
+    st.dataframe(_style_idx(_idx_df), use_container_width=True, hide_index=True)
 
     # ── Segment Tables ────────────────────────────────────────────────────────
     st.markdown("---")
