@@ -1053,19 +1053,66 @@ with tab_acwi:
                 height=700,margin=dict(t=10,b=10,l=10,r=60),xaxis=dict(showgrid=False))
             st.plotly_chart(fig_w2,use_container_width=True)
 
-        # Donut
-        _donut2 = pd.DataFrame([
-            {"Label":"DM","FF MCap":df_acwi_dm["Adjusted FF MCap"].sum()},
-            {"Label":"EM","FF MCap":df_acwi_em["Adjusted FF MCap"].sum()},
-        ])
+        # Donut + IF Impact
         _dc1,_dc2 = st.columns([1,1])
         with _dc1:
             st.markdown("**ACWI Composition (DM vs EM)**")
+            _donut2 = pd.DataFrame([
+                {"Label":"DM","FF MCap":df_acwi_dm["Adjusted FF MCap"].sum()},
+                {"Label":"EM","FF MCap":df_acwi_em["Adjusted FF MCap"].sum()},
+            ])
             fig_d2 = px.pie(_donut2,names="Label",values="FF MCap",
                 color="Label",color_discrete_map={"DM":"#2979ff","EM":"#ce93d8"},
                 template="plotly_dark",hole=0.45)
             fig_d2.update_layout(paper_bgcolor="#0f1117",height=350,margin=dict(t=10,b=10))
             st.plotly_chart(fig_d2,use_container_width=True)
+
+        with _dc2:
+            st.markdown("**Inclusion Factor Impact**")
+            _acwi_all_if = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
+            _tot_ff_t2   = _acwi_all_if["Free Float MCap Y2025"].sum()
+            _tot_adj_t2  = _acwi_all_if["Adjusted FF MCap"].sum()
+            _if_entries_t2 = [
+                (f"China A-Shares (IF {china_inclusion_factor*100:.0f}%)",
+                 _acwi_all_if["Exchange Country Name"].fillna("").str.upper()=="CHINA",
+                 china_inclusion_factor),
+                ("China H-Shares / Red Chips (IF 100%)",
+                 (_acwi_all_if["Mapping Country"].fillna("").str.upper()=="CHINA") &
+                 (_acwi_all_if["Exchange Country Name"].fillna("").str.upper()!="CHINA"), 1.0),
+                (f"Indien (IF {india_inclusion_factor*100:.0f}%)",
+                 _acwi_all_if["Exchange Country Name"].fillna("").str.upper()=="INDIA",
+                 india_inclusion_factor),
+                (f"Vietnam (IF {vietnam_inclusion_factor*100:.0f}%)",
+                 _acwi_all_if["Exchange Country Name"].fillna("").str.upper()=="VIETNAM",
+                 vietnam_inclusion_factor),
+                (f"Saudi-Arabien (IF {saudi_inclusion_factor*100:.0f}%)",
+                 _acwi_all_if["Exchange Country Name"].fillna("").str.upper()=="SAUDI ARABIA",
+                 saudi_inclusion_factor),
+            ]
+            _if_rows_t2 = []
+            for _nm, _msk, _fac in _if_entries_t2:
+                _ff  = _acwi_all_if.loc[_msk, "Free Float MCap Y2025"].sum()
+                _adj = _acwi_all_if.loc[_msk, "Adjusted FF MCap"].sum()
+                if _ff > 0:
+                    _if_rows_t2.append({
+                        "Land": _nm, "Factor": f"{_fac*100:.0f}%",
+                        "Weight (vor)":  round(_ff  / _tot_ff_t2  * 100, 4) if _tot_ff_t2  > 0 else 0,
+                        "Weight (nach)": round(_adj / _tot_adj_t2 * 100, 4) if _tot_adj_t2 > 0 else 0,
+                        "Δ": round(_adj/_tot_adj_t2*100 - _ff/_tot_ff_t2*100, 4) if _tot_ff_t2>0 and _tot_adj_t2>0 else 0,
+                    })
+            if _if_rows_t2:
+                _if_df_t2 = pd.DataFrame(_if_rows_t2)
+                _if_df_t2 = pd.concat([_if_df_t2, pd.DataFrame([{
+                    "Land":"Total","Factor":"—",
+                    "Weight (vor)":  round(_if_df_t2["Weight (vor)"].sum(),  4),
+                    "Weight (nach)": round(_if_df_t2["Weight (nach)"].sum(), 4),
+                    "Δ":             round(_if_df_t2["Δ"].sum(), 4)}])], ignore_index=True)
+                def _sif_t2(df):
+                    def rs(row):
+                        if row["Land"] == "Total": return ["background-color:#1a2a4a;font-weight:600;"]*len(row)
+                        return [""]*len(row)
+                    return df.style.apply(rs, axis=1)
+                st.dataframe(_sif_t2(_if_df_t2), use_container_width=True, hide_index=True)
 
         # Download
         _acwi_dl2 = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
