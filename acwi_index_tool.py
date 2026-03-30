@@ -1437,6 +1437,7 @@ with tab_gs:
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
     # Pipeline Diagnostik
+    _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
     st.markdown(f"""
 <div class="info-box">
 <b>Selektionskriterien</b><br>
@@ -1491,6 +1492,7 @@ with tab_pc:
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
 
     # Pipeline Diagnostik
+    _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
     st.markdown(f"""
 <div class="info-box">
 <b>Selektionskriterien</b><br>
@@ -1501,7 +1503,6 @@ China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_incl
 </div>
 """, unsafe_allow_html=True)
     with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-        _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
         _pc_diag = [
             {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_pc_all["Classification"]=="DM").sum(),"EM":(_pc_all["Classification"]=="EM").sum(),"Total":len(_pc_all),"Δ":"—"},
             {"Schritt":"1 — Universe (Primary only)","DM":(_pc_u["Classification"]=="DM").sum(),"EM":(_pc_u["Classification"]=="EM").sum(),"Total":len(_pc_u),"Δ":f"-{len(_pc_all)-len(_pc_u):,}"},
@@ -1594,6 +1595,7 @@ with tab_gimi:
         _gm_complete["Index_Weight"] = _gm_complete["Adj_FF_MCap"]/_gm_tot_adj*100 if _gm_tot_adj>0 else 0
 
         # Pipeline Diagnostik
+        _gm_all = df_raw_all[df_raw_all["Classification"].notna()]
         st.markdown(f"""
 <div class="info-box">
 <b>Selektionskriterien</b><br>
@@ -1605,7 +1607,6 @@ EUMSS_FULL: {format_bn(_gm_eumss_full)} &nbsp;|&nbsp; EUMSS_FF: {format_bn(_gm_e
 </div>
 """, unsafe_allow_html=True)
         with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-            _gm_all = df_raw_all[df_raw_all["Classification"].notna()]
             _gm_diag = [
                 {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gm_all["Classification"]=="DM").sum(),"EM":(_gm_all["Classification"]=="EM").sum(),"Total":len(_gm_all),"Δ":"—"},
                 {"Schritt":"1 — Universe (Primary only)","DM":(_gm_u["Classification"]=="DM").sum(),"EM":(_gm_u["Classification"]=="EM").sum(),"Total":len(_gm_u),"Δ":f"-{len(_gm_all)-len(_gm_u):,}"},
