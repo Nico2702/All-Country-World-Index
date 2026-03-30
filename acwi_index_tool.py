@@ -1197,18 +1197,22 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
 
     seg_order = ["Large Cap","Mid Cap","Small Cap","Micro Cap"]
 
-    # ── Top metrics ──────────────────────────────────────────────────────────
+    # ── Top metrics (ACWI = Large+Mid only) ─────────────────────────────────
+    _acwi_dm = df_dm[df_dm["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _acwi_em = df_em[df_em["Segment_New"].isin(["Large Cap","Mid Cap"])]
     total_adj = df_included["Adj_FF_MCap"].sum()
-    em_adj    = df_em["Adj_FF_MCap"].sum()
-    em_w      = em_adj/total_adj*100 if total_adj > 0 else 0
+    _acwi_adj = _acwi_dm["Adj_FF_MCap"].sum() + _acwi_em["Adj_FF_MCap"].sum()
+    em_adj    = _acwi_em["Adj_FF_MCap"].sum()
+    em_w      = em_adj / _acwi_adj * 100 if _acwi_adj > 0 else 0
 
-    m1,m2,m3,m4,m5,m6 = st.columns(6)
-    m1.metric("Total Stocks",  f"{len(df_included):,}")
-    m2.metric("DM Stocks",     f"{len(df_dm):,}")
-    m3.metric("EM Stocks",     f"{len(df_em):,}")
-    m4.metric("DM FF MCap",    format_bn(df_dm["Free Float MCap Y2025"].sum()))
-    m5.metric("EM FF MCap",    format_bn(df_em["Free Float MCap Y2025"].sum()))
-    m6.metric("EM Adj. Weight",f"{em_w:.2f}%")
+    m1,m2,m3,m4,m5,m6,m7 = st.columns(7)
+    m1.metric("DM Stocks",       f"{len(_acwi_dm):,}")
+    m2.metric("EM Stocks",       f"{len(_acwi_em):,}")
+    m3.metric("Total ACWI",      f"{len(_acwi_dm)+len(_acwi_em):,}")
+    m4.metric("DM FF MCap",      format_bn(_acwi_dm["Free Float MCap Y2025"].sum()))
+    m5.metric("EM FF MCap",      format_bn(_acwi_em["Free Float MCap Y2025"].sum()))
+    m6.metric("EM Adj. FF MCap", format_bn(em_adj))
+    m7.metric("EM Adj. Weight",  f"{em_w:.2f}%")
 
     # ── 5 Index Products ─────────────────────────────────────────────────────
     st.markdown("---")
