@@ -849,15 +849,13 @@ with tab_acwi:
         _em_w_acwi      = _em_adj_acwi / _total_adj_acwi * 100 if _total_adj_acwi > 0 else 0
 
         c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
-        c1.metric("DM Stocks",        f"{len(df_acwi_dm):,}")
-        c2.metric("EM Stocks",        f"{len(df_acwi_em):,}")
-        c3.metric("Total ACWI",       f"{len(df_acwi_dm)+len(df_acwi_em):,}")
+        c1.metric("Total ACWI",       f"{len(df_acwi_dm)+len(df_acwi_em):,}")
+        c2.metric("DM Stocks",        f"{len(df_acwi_dm):,}")
+        c3.metric("EM Stocks",        f"{len(df_acwi_em):,}")
         c4.metric("DM FF MCap",       format_bn(df_acwi_dm["Free Float MCap Y2025"].sum()))
         c5.metric("EM FF MCap",       format_bn(df_acwi_em["Free Float MCap Y2025"].sum()))
         c6.metric("EM Adj. FF MCap",  format_bn(_em_adj_acwi))
         c7.metric("EM Adj. Weight",   f"{_em_w_acwi:.2f}%")
-
-        st.markdown(f"**EM Threshold:** ≥ {em_threshold_pct:.1f}% × DM Grenzstock Total MCap = {format_bn(_em_min_mcap)}")
 
         # Pipeline Diagnostik
         _t2_all = df_raw_all[df_raw_all["Classification"].notna()]
@@ -865,6 +863,7 @@ with tab_acwi:
 <div class="info-box">
 <b>Selektionskriterien</b><br>
 Listing: All (Primary + Secondary) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; DM: Global Sort V1 &nbsp;|&nbsp; EM: Threshold {em_threshold_pct:.1f}%<br>
+EM Min MCap: ≥ {em_threshold_pct:.1f}% × DM Grenzstock ({format_bn(_cutoff_v1['Total MCap Y2025'])}) = {format_bn(_em_min_mcap)}<br>
 ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
 Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
 China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
@@ -1209,9 +1208,9 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
     em_w      = em_adj / _acwi_adj * 100 if _acwi_adj > 0 else 0
 
     m1,m2,m3,m4,m5,m6,m7 = st.columns(7)
-    m1.metric("DM Stocks",       f"{len(_acwi_dm):,}")
-    m2.metric("EM Stocks",       f"{len(_acwi_em):,}")
-    m3.metric("Total ACWI",      f"{len(_acwi_dm)+len(_acwi_em):,}")
+    m1.metric("Total ACWI",      f"{len(_acwi_dm)+len(_acwi_em):,}")
+    m2.metric("DM Stocks",       f"{len(_acwi_dm):,}")
+    m3.metric("EM Stocks",       f"{len(_acwi_em):,}")
     m4.metric("DM FF MCap",      format_bn(_acwi_dm["Free Float MCap Y2025"].sum()))
     m5.metric("EM FF MCap",      format_bn(_acwi_em["Free Float MCap Y2025"].sum()))
     m6.metric("EM Adj. FF MCap", format_bn(em_adj))
