@@ -844,8 +844,9 @@ with tab_acwi:
         _cutoff_mcap = _cutoff_v1["Total MCap Y2025"]
         _em_min_mcap = _cutoff_mcap * (em_threshold_pct / 100)
         df_acwi_dm = _seg_dm_v1[_seg_dm_v1["Segment"].isin(["Large Cap","Mid Cap"])].copy()
-        df_acwi_em = filter_em_by_threshold(_df_em_post, _cutoff_mcap, em_threshold_pct / 100)
-        df_acwi_em = apply_post_filter(df_acwi_em)
+        _em_result = filter_em_by_threshold(_df_em_post, _cutoff_mcap, em_threshold_pct)
+        df_acwi_em = _em_result[0] if isinstance(_em_result, tuple) else _em_result
+        df_acwi_em = df_acwi_em[df_acwi_em["Segment"] == "EM Included"].copy() if "Segment" in df_acwi_em.columns else df_acwi_em
 
         # Add adjusted weights
         df_acwi_dm = add_adjusted_weight(df_acwi_dm, china_inclusion_factor, india_inclusion_factor,
