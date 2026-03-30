@@ -957,13 +957,14 @@ with tab_acwi:
         _em_adj_acwi    = df_acwi_em["Adjusted FF MCap"].sum()
         _em_w_acwi      = _em_adj_acwi / _total_adj_acwi * 100 if _total_adj_acwi > 0 else 0
 
-        c1,c2,c3,c4,c5,c6 = st.columns(6)
-        c1.metric("DM Stocks",     f"{len(df_acwi_dm):,}")
-        c2.metric("EM Stocks",     f"{len(df_acwi_em):,}")
-        c3.metric("Total ACWI",    f"{len(df_acwi_dm)+len(df_acwi_em):,}")
-        c4.metric("DM FF MCap",    format_bn(df_acwi_dm["Free Float MCap Y2025"].sum()))
-        c5.metric("EM FF MCap",    format_bn(df_acwi_em["Free Float MCap Y2025"].sum()))
-        c6.metric("EM Adj. Weight",f"{_em_w_acwi:.2f}%")
+        c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
+        c1.metric("DM Stocks",        f"{len(df_acwi_dm):,}")
+        c2.metric("EM Stocks",        f"{len(df_acwi_em):,}")
+        c3.metric("Total ACWI",       f"{len(df_acwi_dm)+len(df_acwi_em):,}")
+        c4.metric("DM FF MCap",       format_bn(df_acwi_dm["Free Float MCap Y2025"].sum()))
+        c5.metric("EM FF MCap",       format_bn(df_acwi_em["Free Float MCap Y2025"].sum()))
+        c6.metric("EM Adj. FF MCap",  format_bn(_em_adj_acwi))
+        c7.metric("EM Adj. Weight",   f"{_em_w_acwi:.2f}%")
 
         st.markdown(f"**EM Threshold:** ≥ {em_threshold_pct:.1f}% × DM Grenzstock Total MCap = {format_bn(_em_min_mcap)}")
 
@@ -1003,7 +1004,7 @@ with tab_acwi:
                 Adj=("Adjusted FF MCap","sum"), Avg=("Total MCap Y2025","mean")).reset_index()
             _dm_ct["FF MCap"] = _dm_ct["FF_MCap"].apply(format_bn)
             _dm_ct["Avg MCap"] = _dm_ct["Avg"].apply(format_bn)
-            _dm_ct["Weight %"] = (_dm_ct["Adj"]/_total_adj_acwi*100).round(2)
+            _dm_ct["Weight %"] = (_dm_ct["Adj"]/_total_adj_acwi*100).apply(lambda x: f"{x:.2f}%")
             st.dataframe(_dm_ct.sort_values("Adj",ascending=False)[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"}),
                 use_container_width=True, hide_index=True)
         with _ccol2:
@@ -1013,7 +1014,7 @@ with tab_acwi:
                 Adj=("Adjusted FF MCap","sum"), Avg=("Total MCap Y2025","mean")).reset_index()
             _em_ct["FF MCap"] = _em_ct["FF_MCap"].apply(format_bn)
             _em_ct["Avg MCap"] = _em_ct["Avg"].apply(format_bn)
-            _em_ct["Weight %"] = (_em_ct["Adj"]/_total_adj_acwi*100).round(2)
+            _em_ct["Weight %"] = (_em_ct["Adj"]/_total_adj_acwi*100).apply(lambda x: f"{x:.2f}%")
             st.dataframe(_em_ct.sort_values("Adj",ascending=False)[["Mapping Country","Stocks","FF MCap","Avg MCap","Weight %"]].rename(columns={"Mapping Country":"Land"}),
                 use_container_width=True, hide_index=True)
 
