@@ -1412,8 +1412,8 @@ with tab_gs:
 
     # Global sort → segments
     _gs_sorted = _gs_liq.sort_values("Total MCap Y2025", ascending=False).copy()
-    _gs_ff_tot = _gs_sorted["Free Float MCap Y2025"].sum()
-    _gs_sorted["_cum_pct"] = _gs_sorted["Free Float MCap Y2025"].cumsum() / _gs_ff_tot * 100 if _gs_ff_tot>0 else 0
+    _gs_adj_tot = _gs_sorted["Adj_FF_MCap"].sum()
+    _gs_sorted["_cum_pct"] = _gs_sorted["Adj_FF_MCap"].cumsum() / _gs_adj_tot * 100 if _gs_adj_tot>0 else 0
     _gs_sorted["Segment_New"] = np.where(_gs_sorted["_cum_pct"] <= large_thr, "Large Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= mid_thr,   "Mid Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= small_thr, "Small Cap", "Micro Cap")))
