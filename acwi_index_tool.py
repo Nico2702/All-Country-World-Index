@@ -1738,7 +1738,12 @@ with tab_compare:
             _vstats(_gm_complete, "GIMI Method",            "Primary only", "Pre"),
         ]
         _cmp_df = pd.DataFrame(_cmp_rows)
-        st.dataframe(_cmp_df, use_container_width=True, hide_index=True)
+        def _style_cmp(df):
+            styles = pd.DataFrame("", index=df.index, columns=df.columns)
+            if "ACWI" in df.columns:
+                styles["ACWI"] = "background-color:#1a3a5c;font-weight:700;"
+            return styles
+        st.dataframe(_cmp_df.style.apply(_style_cmp, axis=None), use_container_width=True, hide_index=True)
 
         # Country weight comparison
         st.markdown("---")
