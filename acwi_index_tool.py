@@ -859,6 +859,27 @@ with tab_acwi:
 
         st.markdown(f"**EM Threshold:** ≥ {em_threshold_pct:.1f}% × DM Grenzstock Total MCap = {format_bn(_em_min_mcap)}")
 
+        # Pipeline Diagnostik
+        _t2_all = df_raw_all[df_raw_all["Classification"].notna()]
+        st.markdown(f"""
+<div class="info-box">
+<b>Selektionskriterien</b><br>
+Listing: All (Primary + Secondary) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; DM: Global Sort V1 &nbsp;|&nbsp; EM: Threshold {em_threshold_pct:.1f}%<br>
+ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
+China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
+</div>
+""", unsafe_allow_html=True)
+        with st.expander("🔍 Pipeline Diagnostik", expanded=False):
+            _t2_diag = [
+                {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_t2_all["Classification"]=="DM").sum(),"EM":(_t2_all["Classification"]=="EM").sum(),"Total":len(_t2_all),"Δ":"—"},
+                {"Schritt":"1 — Liquiditätsfilter (Post)","DM":len(_df_dm_post),"EM":len(_df_em_post),"Total":len(_df_dm_post)+len(_df_em_post),"Δ":f"-{len(_t2_all)-len(_df_dm_post)-len(_df_em_post):,}"},
+                {"Schritt":"2 — DM Segmentierung (Global Sort V1)","DM":len(df_acwi_dm),"EM":"—","Total":len(df_acwi_dm),"Δ":f"-{len(_df_dm_post)-len(df_acwi_dm):,}"},
+                {"Schritt":f"3 — EM Threshold ({em_threshold_pct:.1f}% DM Grenzstock)","DM":"—","EM":len(df_acwi_em),"Total":len(df_acwi_em),"Δ":f"-{len(_df_em_post)-len(df_acwi_em):,}"},
+            ]
+            st.dataframe(pd.DataFrame(_t2_diag), use_container_width=True, hide_index=True)
+            st.caption(f"DM Grenzstock Total MCap: {format_bn(_cutoff_v1['Total MCap Y2025'])} | EM Min MCap: {format_bn(_em_min_mcap)}")
+
         # DM Segments table
         _col_dm_t, _col_em_t = st.columns(2)
         with _col_dm_t:
