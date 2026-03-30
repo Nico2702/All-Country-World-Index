@@ -1437,8 +1437,16 @@ with tab_gs:
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
     # Pipeline Diagnostik
+    st.markdown(f"""
+<div class="info-box">
+<b>Selektionskriterien</b><br>
+Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; IF: {if_selection_mode}<br>
+ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
+China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
+</div>
+""", unsafe_allow_html=True)
     with st.expander("🔍 Pipeline Diagnostik", expanded=False):
-        _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
         _gs_diag = [
             {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gs_all["Classification"]=="DM").sum(),"EM":(_gs_all["Classification"]=="EM").sum(),"Total":len(_gs_all),"Δ":"—"},
             {"Schritt":"1 — Universe (Primary only)","DM":(_gs_u["Classification"]=="DM").sum(),"EM":(_gs_u["Classification"]=="EM").sum(),"Total":len(_gs_u),"Δ":f"-{len(_gs_all)-len(_gs_u):,}"},
@@ -1483,6 +1491,15 @@ with tab_pc:
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
 
     # Pipeline Diagnostik
+    st.markdown(f"""
+<div class="info-box">
+<b>Selektionskriterien</b><br>
+Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Post &nbsp;|&nbsp; IF: {if_selection_mode}<br>
+ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
+China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%
+</div>
+""", unsafe_allow_html=True)
     with st.expander("🔍 Pipeline Diagnostik", expanded=False):
         _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
         _pc_diag = [
@@ -1577,6 +1594,16 @@ with tab_gimi:
         _gm_complete["Index_Weight"] = _gm_complete["Adj_FF_MCap"]/_gm_tot_adj*100 if _gm_tot_adj>0 else 0
 
         # Pipeline Diagnostik
+        st.markdown(f"""
+<div class="info-box">
+<b>Selektionskriterien</b><br>
+Listing: Primary only + Secondary Listings (re-added) &nbsp;|&nbsp; Filter: Pre &nbsp;|&nbsp; IF: {if_selection_mode}<br>
+ADTV DM: {new_adtv_dm:,.0f} USD &nbsp;|&nbsp; ADTV EM: {new_adtv_em:,.0f} USD &nbsp;|&nbsp; ATVR DM: {new_atvr_dm*100:.0f}% &nbsp;|&nbsp; ATVR EM: {new_atvr_em*100:.0f}%<br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}% &nbsp;|&nbsp; Min FF: {min_ff_pct*100:.0f}%<br>
+China IF: {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien IF: {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam IF: {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi IF: {saudi_inclusion_factor*100:.0f}%<br>
+EUMSS_FULL: {format_bn(_gm_eumss_full)} &nbsp;|&nbsp; EUMSS_FF: {format_bn(_gm_eumss_ff)} &nbsp;|&nbsp; FF Ratio: {new_eumss_ff_ratio*100:.0f}%
+</div>
+""", unsafe_allow_html=True)
         with st.expander("🔍 Pipeline Diagnostik", expanded=False):
             _gm_all = df_raw_all[df_raw_all["Classification"].notna()]
             _gm_diag = [
