@@ -166,8 +166,8 @@ def apply_step8_secondary(df_step7, df_raw_orig, eumss_full, eumss_ff, min_ff_pc
                            df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"] > 0,
                            df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"] > 0,
                            df_sec["1M ADTV Y2025"])))
-    df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"] > 0,
-                               df_sec["_adtv_best"] * 252 / df_sec["Total MCap Y2025"], 0)
+    df_sec["ATVR"] = np.where(df_sec["Free Float MCap Y2025"] > 0,
+                               df_sec["_adtv_best"] * 252 / df_sec["Free Float MCap Y2025"], 0)
     df_sec = df_sec[
         ((df_sec["Classification"] == "DM") & (df_sec["ATVR"] >= atvr_dm_min)) |
         ((df_sec["Classification"] == "EM") & (df_sec["ATVR"] >= atvr_em_min))
@@ -1128,8 +1128,8 @@ def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
                       df["6M ADTV Y2025"].where(df["6M ADTV Y2025"]>0,
                       df["3M ADTV Y2025"].where(df["3M ADTV Y2025"]>0,
                       df["1M ADTV Y2025"])))
-    df["ATVR"] = np.where(df["Total MCap Y2025"]>0,
-                          df["ADTV_Best"]*252/df["Total MCap Y2025"], 0)
+    df["ATVR"] = np.where(df["Free Float MCap Y2025"]>0,
+                          df["ADTV_Best"]*252/df["Free Float MCap Y2025"], 0)
     return df
 
 
@@ -1217,8 +1217,8 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
                           df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"]>0,
                           df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"]>0,
                           df_sec["1M ADTV Y2025"])))
-    df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"]>0,
-                              df_sec["ADTV_Best"]*252/df_sec["Total MCap Y2025"], 0)
+    df_sec["ATVR"] = np.where(df_sec["Free Float MCap Y2025"]>0,
+                              df_sec["ADTV_Best"]*252/df_sec["Free Float MCap Y2025"], 0)
 
     # Classification — already set on df_raw_original at load time
     # Just filter out stocks with no mapping
