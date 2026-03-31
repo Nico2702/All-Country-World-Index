@@ -1140,14 +1140,18 @@ def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Co
 
 
 def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, atvr_em,
-                             max_price, thailand_mode, china_if, india_if, vietnam_if, saudi_if):
-    """Add secondary share classes for selected entities."""
+                             max_price, thailand_mode, china_if, india_if, vietnam_if, saudi_if,
+                             min_ff_pct=0.15):
+    """Add secondary share classes for selected entities.
+    Secondaries must pass the same liquidity, FF% and price checks as primaries.
+    """
     selected_entities = set(df_selected["Entity ID"].dropna().unique())
     df_sec = df_raw_orig[
         (df_raw_orig["Listing"].fillna("") == "Secondary") &
         (df_raw_orig["Entity ID"].isin(selected_entities))
     ].copy()
-    # Exclude Thailand NVDRs/SHAREs already handled
+
+    # Thailand handling
     _th = df_sec["Exchange Name"].fillna("").str.upper() == "THAILAND"
     if thailand_mode == "NVDR":
         df_sec = df_sec[~(_th & (df_sec["Sec Type"].fillna("") == "SHARE"))].copy()
@@ -1161,22 +1165,54 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
                 "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025","Closing Price"]:
         df_sec[col] = pd.to_numeric(df_sec[col], errors="coerce").fillna(0)
 
+    # ── Same checks as primary pipeline ──────────────────────────────────────
+    # FF MCap > 0
     df_sec = df_sec[df_sec["Free Float MCap Y2025"] > 0].copy()
+
+    # Free Float %
+    df_sec = df_sec[df_sec["Free Float Percent"] >= min_ff_pct].copy()
+
+    # Max Price
     if max_price:
         df_sec = df_sec[df_sec["Closing Price"].fillna(0) < max_price].copy()
 
+    if len(df_sec) == 0:
+        return df_selected
+
+    # Inclusion Factors + Adj_FF_MCap
     ecn = df_sec["Exchange Country Name"].fillna("")
     df_sec["IF"] = np.where(ecn.str.upper()=="CHINA",        china_if,
                    np.where(ecn.str.upper()=="INDIA",        india_if,
                    np.where(ecn.str.upper()=="VIETNAM",      vietnam_if,
                    np.where(ecn.str.upper()=="SAUDI ARABIA", saudi_if, 1.0))))
     df_sec["Adj_FF_MCap"] = df_sec["Free Float MCap Y2025"] * df_sec["IF"]
+
+    # ADTV_Best + ATVR
     df_sec["ADTV_Best"] = df_sec["12M ADTV Y2025"].where(df_sec["12M ADTV Y2025"]>0,
                           df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"]>0,
                           df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"]>0,
                           df_sec["1M ADTV Y2025"])))
     df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"]>0,
                               df_sec["ADTV_Best"]*252/df_sec["Total MCap Y2025"], 0)
+
+    # Classification (inherit from primary via Entity ID)
+    cls_map = df_selected[["Entity ID","Classification"]].drop_duplicates()\
+                .set_index("Entity ID")["Classification"].to_dict()
+    df_sec["Classification"] = df_sec["Entity ID"].map(cls_map)
+    df_sec = df_sec[df_sec["Classification"].notna()].copy()
+
+    # Liquidity filter: 3M ADTV + 6M ADTV + ATVR
+    liq_mask = (
+        ((df_sec["Classification"]=="DM") &
+         (df_sec["3M ADTV Y2025"] >= adtv_dm) &
+         (df_sec["6M ADTV Y2025"] >= adtv_dm) &
+         (df_sec["ATVR"] >= atvr_dm)) |
+        ((df_sec["Classification"]=="EM") &
+         (df_sec["3M ADTV Y2025"] >= adtv_em) &
+         (df_sec["6M ADTV Y2025"] >= adtv_em) &
+         (df_sec["ATVR"] >= atvr_em))
+    )
+    df_sec = df_sec[liq_mask].copy()
 
     # Remove already included symbols
     existing_symbols = set(df_selected["Symbol"].unique())
@@ -1520,7 +1556,8 @@ with tab_gs:
 
     _gs_final = add_secondary_listings(_gs_sorted, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        min_ff_pct=min_ff_pct)
 
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
@@ -1566,7 +1603,8 @@ with tab_pc:
 
     _pc_final = add_secondary_listings(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        min_ff_pct=min_ff_pct)
 
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
@@ -1657,7 +1695,8 @@ with tab_gimi:
         # Add secondary listings for standard index only
         _gm_final = add_secondary_listings(_gm_std, df_raw_original, new_adtv_dm, new_adtv_em,
             new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
-            china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+            china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+            min_ff_pct=min_ff_pct)
 
         _gm_complete = pd.concat([_gm_final, _gm_small, _gm_above85, _gm_micro], ignore_index=True)
         _gm_complete = _gm_complete.drop_duplicates(subset=["Symbol"]).copy()
