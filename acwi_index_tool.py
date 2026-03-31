@@ -657,13 +657,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
-tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare = st.tabs([
+tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix = st.tabs([
     "🌍 Universe Overview",
     "🌐 ACWI (DM + EM)",
     "📊 Global Sort (Threshold)",
     "🗺️ Per Country (Solactive)",
     "⚡ GIMI Method",
     "🔀 ACWI & Varianten Vergleich",
+    "🧮 Liquidity Matrix",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1708,56 +1709,48 @@ def compute_liquidity_matrix(
     large_thr, mid_thr, small_thr,
     eumss_ff_ratio, em_threshold_pct,
 ):
-    """Compute ACWI stock count for all 48 parameter combinations × 4 methods."""
+    """Compute ACWI stock count for all 32 parameter combinations × 4 methods."""
     matrix_params = [
+        # FF 10% — ATVR (0,0)
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        # FF 10% — ATVR (10,10)
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        # FF 10% — ATVR (20,10)
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        # FF 10% — ATVR (20,15)
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        # FF 15% — ATVR (0,0)
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        # FF 15% — ATVR (10,10)
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        # FF 15% — ATVR (20,10)
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        # FF 15% — ATVR (20,15)
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
         {"IF greift bei:": "Selektion", "Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
-        {"IF greift bei:": "Gewichtung","Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
     ]
 
     results = []
@@ -1961,12 +1954,25 @@ with tab_compare:
     except Exception as _e:
         st.warning(f"⚠️ Bitte zuerst alle Tabs aufrufen damit alle Varianten berechnet werden. ({_e})")
 
-    # ── Liquidity Matrix ──────────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("## 🧮 Liquidity Matrix")
-    st.caption("ACWI Stock Count (Large+Mid) für alle 48 Parameterkombinationen × 4 Methoden")
 
-    with st.spinner("Berechne Liquidity Matrix (48 × 4 Kombinationen)..."):
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 7: Liquidity Matrix
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_matrix:
+    st.markdown("## 🧮 Liquidity Matrix")
+    st.caption("ACWI Stock Count (Large+Mid) für alle 32 Parameterkombinationen × 4 Methoden — IF: Selektion")
+
+    st.markdown(f"""
+<div class="info-box">
+<b>Fixierte Parameter (aus Sidebar)</b><br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}%<br>
+Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi {saudi_inclusion_factor*100:.0f}%<br>
+EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
+<br>Variiert: IF greift bei: (Selektion) &nbsp;|&nbsp; Free Float % (10% / 15%) &nbsp;|&nbsp; ADTV DM/EM &nbsp;|&nbsp; ATVR DM/EM
+</div>
+""", unsafe_allow_html=True)
+
+    with st.spinner("Berechne Liquidity Matrix (32 × 4 Kombinationen)..."):
         _lm_df = compute_liquidity_matrix(
             df_raw_original, df_raw_all, country_cls,
             thailand_sec_type, max_closing_price,
@@ -1991,4 +1997,12 @@ with tab_compare:
                         styles.loc[idx, col] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
         return styles
 
-    st.dataframe(_lm_df.style.apply(_style_lm, axis=None), use_container_width=True, hide_index=True, height=500)
+    st.dataframe(_lm_df.style.apply(_style_lm, axis=None), use_container_width=True, hide_index=True, height=600)
+
+    # Download
+    st.download_button(
+        "⬇️ Download Liquidity Matrix als Excel",
+        data=to_excel_download(_lm_df, sheet_name="Liquidity Matrix"),
+        file_name="NaroIX_Liquidity_Matrix.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
