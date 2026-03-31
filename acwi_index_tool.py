@@ -610,11 +610,14 @@ try:
 except:
     country_cls = {}
 
-# Apply classification to df_raw
-df_raw["Mapping Country"] = df_raw.apply(
-    lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
-              else r.get("Country of Risk",""), axis=1)
-df_raw["Classification"] = df_raw["Mapping Country"].map(country_cls)
+# Apply Mapping Country + Classification to BOTH df_raw and df_raw_original
+# This must happen before any exclusions or filters so every stock — including
+# secondaries that may later be excluded — carries its DM/EM classification.
+for _df in [df_raw, df_raw_original]:
+    _df["Mapping Country"] = _df.apply(
+        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+                  else r.get("Country of Risk",""), axis=1)
+    _df["Classification"] = _df["Mapping Country"].map(country_cls)
 
 # ── Tab 2 (ACWI) specific: build All universe (legacy) ───────────────────────
 # Thailand filter
@@ -1216,10 +1219,12 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
     df_sec["ATVR"] = np.where(df_sec["Total MCap Y2025"]>0,
                               df_sec["ADTV_Best"]*252/df_sec["Total MCap Y2025"], 0)
 
-    # Classification (inherit from primary via Entity ID)
-    cls_map = df_selected[["Entity ID","Classification"]].drop_duplicates()\
-                .set_index("Entity ID")["Classification"].to_dict()
-    df_sec["Classification"] = df_sec["Entity ID"].map(cls_map)
+    # Classification — already set on df_raw_original at load time
+    # Just filter out stocks with no mapping
+    if "Classification" not in df_sec.columns or df_sec["Classification"].isna().all():
+        cls_map = df_selected[["Entity ID","Classification"]].drop_duplicates(subset=["Entity ID"])\
+                    .set_index("Entity ID")["Classification"].to_dict()
+        df_sec["Classification"] = df_sec["Entity ID"].map(cls_map)
     df_sec = df_sec[df_sec["Classification"].notna()].copy()
 
     # Liquidity filter: 3M ADTV + 6M ADTV + ATVR
@@ -1241,6 +1246,13 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
 
     if len(df_sec) == 0:
         return df_selected
+
+    # Inherit Segment_New from primary via Entity ID
+    if "Segment_New" in df_selected.columns:
+        seg_map = df_selected[["Entity ID","Segment_New"]].drop_duplicates(subset=["Entity ID"])\
+                    .set_index("Entity ID")["Segment_New"].to_dict()
+        df_sec["Segment_New"] = df_sec["Entity ID"].map(seg_map)
+
     return pd.concat([df_selected, df_sec], ignore_index=True)
 
 
