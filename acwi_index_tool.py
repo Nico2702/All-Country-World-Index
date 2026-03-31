@@ -1274,7 +1274,8 @@ def render_new_tab(tab_name, df_included, large_pct, mid_pct,
                    params_dict,
                    diag_rows=None, diag_caption=None,
                    adtv_dm=0, adtv_em=0, atvr_dm=0, atvr_em=0,
-                   small_pct=99, min_ff=0.15, if_mode="Selektion"):
+                   small_pct=99, min_ff=0.15, if_mode="Selektion",
+                   df_universe=None):
     """Render standard visuals for a new index tab."""
 
     df_dm = df_included[df_included["Classification"]=="DM"].copy()
@@ -1559,11 +1560,16 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
     # ── Download ──────────────────────────────────────────────────────────────
     st.markdown("---")
     _drop = ["_cum_pct","_c","_cp2","ADTV_Best","IF"]
-    _drop_universe = _drop + ["Index_Weight"]  # Universe heeft geen Index_Weight
+    _drop_universe = _drop + ["Index_Weight"]
 
     def _prep(df, adj_col="Adj_FF_MCap"):
         cols = [c for c in df.columns if c not in _drop]
         return normalize_index_weight(df[cols].copy(), adj_col)
+
+    # Universe sheet: use df_universe if provided (full primary universe),
+    # otherwise fall back to df_included
+    _universe_dl = (df_universe if df_universe is not None else df_included).copy()
+    _universe_dl = _universe_dl[[c for c in _universe_dl.columns if c not in _drop_universe]]
 
     _world_dm_dl  = df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
     _world_em_dl  = df_included[(df_included["Classification"]=="EM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
@@ -1575,7 +1581,7 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
     st.download_button(
         f"⬇️ Download {tab_name} als Excel",
         data=to_excel_multi({
-            "Universe":           df_included[[c for c in df_included.columns if c not in _drop_universe]],
+            "Universe":           _universe_dl,
             "World Index (DM)":   _prep(_world_dm_dl),
             "EM Index":           _prep(_world_em_dl),
             "ACWI Index":         _prep(_acwi_dl),
@@ -1622,6 +1628,12 @@ with tab_gs:
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
+    # Full universe for download: _gs_u with segment labels
+    _gs_seg_map = {**dict(zip(_gs_sorted["Symbol"], _gs_sorted["Segment_New"])),
+                   **dict(zip(_gs_final["Symbol"],  _gs_final["Segment_New"]))}
+    _gs_u_full = _gs_u.copy()
+    _gs_u_full["Segment_New"] = _gs_u_full["Symbol"].map(_gs_seg_map).fillna("Excluded")
+
     _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
     _gs_diag = [
         {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_gs_all["Classification"]=="DM").sum(),"EM":(_gs_all["Classification"]=="EM").sum(),"Total":len(_gs_all),"Δ":"—"},
@@ -1642,7 +1654,8 @@ with tab_gs:
         _gs_params, diag_rows=_gs_diag,
         diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
         adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
-        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
+        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
+        df_universe=_gs_u_full)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1670,6 +1683,13 @@ with tab_pc:
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
 
+    # Full universe for download
+    _pc_seg_map = dict(zip(_pc_seg["Symbol"], _pc_seg["Segment_New"]))
+    _pc_final_map = dict(zip(_pc_final["Symbol"], _pc_final["Segment_New"]))
+    _pc_all_seg = {**_pc_seg_map, **_pc_final_map}
+    _pc_u_full = _pc_u.copy()
+    _pc_u_full["Segment_New"] = _pc_u_full["Symbol"].map(_pc_all_seg).fillna("Excluded")
+
     _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
     _pc_diag = [
         {"Schritt":"0 — Universe (Primary + Secondary)","DM":(_pc_all["Classification"]=="DM").sum(),"EM":(_pc_all["Classification"]=="EM").sum(),"Total":len(_pc_all),"Δ":"—"},
@@ -1690,7 +1710,8 @@ with tab_pc:
         _pc_params, diag_rows=_pc_diag,
         diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
         adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
-        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
+        small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
+        df_universe=_pc_u_full)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1743,15 +1764,20 @@ with tab_gimi:
 
         _gm_std = pd.concat(_gm_results, ignore_index=True) if _gm_results else pd.DataFrame(columns=_gm_liq.columns.tolist()+["Segment_New"])
 
-        # Small Cap = passed EUMSS but not in liquidity filter or not in 85%
-        _gm_small = _gm_eumss[~_gm_eumss.index.isin(_gm_liq.index)].copy()
+        # Small Cap = passed EUMSS but not in liquidity filter
+        _gm_std_symbols   = set(_gm_std["Symbol"].dropna().unique())
+        _gm_liq_symbols   = set(_gm_liq["Symbol"].dropna().unique())
+        _gm_eumss_symbols = set(_gm_eumss["Symbol"].dropna().unique())
+        _gm_u_symbols     = set(_gm_u["Symbol"].dropna().unique())
+
+        _gm_small = _gm_eumss[~_gm_eumss["Symbol"].isin(_gm_liq_symbols)].copy()
         _gm_small["Segment_New"] = "Small Cap"
         # Also add stocks in liquidity but above 85% cutoff
-        _gm_above85 = _gm_liq[~_gm_liq.index.isin(_gm_std.index)].copy()
+        _gm_above85 = _gm_liq[~_gm_liq["Symbol"].isin(_gm_std_symbols)].copy()
         _gm_above85["Segment_New"] = "Small Cap"
 
         # Micro Cap = below EUMSS
-        _gm_micro = _gm_u[~_gm_u.index.isin(_gm_eumss.index)].copy()
+        _gm_micro = _gm_u[~_gm_u["Symbol"].isin(_gm_eumss_symbols)].copy()
         _gm_micro["Segment_New"] = "Micro Cap"
 
         # Add secondary listings for standard index only
@@ -1787,12 +1813,18 @@ with tab_gimi:
             "DM ATVR (%)":f"{new_atvr_dm*100:.0f}%","EM ATVR (%)":f"{new_atvr_em*100:.0f}%",
             "Max Price (USD)":f"{max_closing_price:,.0f}" if max_closing_price else "—"}
 
+        # Full universe for download: _gm_u with segment labels
+        _gm_seg_map = dict(zip(_gm_complete["Symbol"], _gm_complete["Segment_New"]))
+        _gm_u_full = _gm_u.copy()
+        _gm_u_full["Segment_New"] = _gm_u_full["Symbol"].map(_gm_seg_map).fillna("Excluded")
+
         render_new_tab("GIMI Method", _gm_complete, large_thr, mid_thr,
             china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
             _gm_params, diag_rows=_gm_diag,
             diag_caption=_gm_diag_caption,
             adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
-            small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode)
+            small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
+            df_universe=_gm_u_full)
     else:
         st.error("Keine DM Stocks gefunden.")
 
