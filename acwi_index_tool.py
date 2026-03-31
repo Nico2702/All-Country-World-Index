@@ -1862,13 +1862,19 @@ def compute_liquidity_matrix(
         gs_s["Segment_New"] = np.where(gs_s["_c"] <= large_thr, "Large Cap",
                               np.where(gs_s["_c"] <= mid_thr, "Mid Cap",
                               np.where(gs_s["_c"] <= small_thr, "Small Cap", "Micro Cap")))
-        gs_count = gs_s[gs_s["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+        gs_final = add_secondary_listings(gs_s, _df_raw_orig, adtv_dm, adtv_em,
+            atvr_dm, atvr_em, max_price, thailand_mode,
+            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+        gs_count = gs_final[gs_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- Per Country ---
         liq_pc = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
         pc_s = assign_segments_new(liq_pc, large_thr, mid_thr, small_thr,
             group_col="Mapping Country", sort_col=sort_col)
-        pc_count = pc_s[pc_s["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+        pc_final = add_secondary_listings(pc_s, _df_raw_orig, adtv_dm, adtv_em,
+            atvr_dm, atvr_em, max_price, thailand_mode,
+            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+        pc_count = pc_final[pc_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- GIMI ---
         gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
@@ -1883,7 +1889,7 @@ def compute_liquidity_matrix(
                 mask_e = ((u["Total MCap Y2025"] >= eumss_full) &
                           (u["Free Float MCap Y2025"] >= eumss_ff) &
                           (u["Free Float Percent"] >= ff_pct))
-                gm_e = u[mask_e].copy()
+                gm_e   = u[mask_e].copy()
                 gm_liq = apply_liquidity_new(gm_e, adtv_dm, adtv_em, atvr_dm, atvr_em)
                 gm_res = []
                 for _, grp in gm_liq.groupby("Mapping Country"):
@@ -1900,7 +1906,11 @@ def compute_liquidity_matrix(
                     gm_res.append(inc)
                 if gm_res:
                     gm_std = pd.concat(gm_res, ignore_index=True)
-                    gm_count = gm_std[gm_std["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
+                    # Add secondary listings — identical to Tab 5
+                    gm_final = add_secondary_listings(gm_std, _df_raw_orig, adtv_dm, adtv_em,
+                        atvr_dm, atvr_em, max_price, thailand_mode,
+                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+                    gm_count = gm_final[gm_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- ACWI V1 + Threshold (All listings) ---
         df_all = _df_raw_all[_df_raw_all["Classification"].notna()].copy()
