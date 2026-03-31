@@ -615,7 +615,7 @@ except:
 # secondaries that may later be excluded — carries its DM/EM classification.
 for _df in [df_raw, df_raw_original]:
     _df["Mapping Country"] = _df.apply(
-        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+        lambda r: r["Country of Incorp"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
                   else r.get("Country of Risk",""), axis=1)
     _df["Classification"] = _df["Mapping Country"].map(country_cls)
 
@@ -795,7 +795,7 @@ with tab_overview:
 
     # 9. Kein Classification-Mapping
     _exc_df["_MappingCountry"] = _exc_df.apply(
-        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+        lambda r: r["Country of Incorp"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
                   else r.get("Country of Risk",""), axis=1)
     _exc_df["_Classification"] = _exc_df["_MappingCountry"].map(country_cls)
     _m = (_exc_df["_Classification"].isna()) & (_exc_reason == "")
@@ -1110,7 +1110,7 @@ def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
 
     # Step 4: Classification
     df["Mapping Country"] = df.apply(
-        lambda r: r["Exchange Country Name"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
+        lambda r: r["Country of Incorp"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
                   else r.get("Country of Risk",""), axis=1)
     df["Classification"] = df["Mapping Country"].map(country_cls)
     df = df[df["Classification"].notna()].copy()
