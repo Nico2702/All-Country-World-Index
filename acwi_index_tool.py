@@ -507,6 +507,17 @@ with st.sidebar:
     try:    new_atvr_em = float(_atvr_em_raw) / 100
     except: new_atvr_em = 0.0
 
+    st.caption("ATVR Nenner")
+    atvr_denominator = st.radio(
+        "ATVR Basis:",
+        ["Free Float MCap", "Total MCap"],
+        index=0,
+        horizontal=True,
+        key="atvr_denominator",
+        help="Free Float MCap: MSCI-konform, höhere ATVR-Werte bei niedrigem FF.\nTotal MCap: konservativer, verhindert fälschliche Einstufung von Low-Float Stocks als liquide."
+    )
+    atvr_mcap_col = "Free Float MCap Y2025" if atvr_denominator == "Free Float MCap" else "Total MCap Y2025"
+
     # Legacy aliases for old code
     dm_min_adtv_3m = new_adtv_dm; dm_min_adtv_6m = new_adtv_dm
     em_min_adtv_3m = new_adtv_em; em_min_adtv_6m = new_adtv_em
@@ -1072,7 +1083,8 @@ Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {
 # ══════════════════════════════════════════════════════════════════════════════
 def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
                        excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
-                       china_if, india_if, vietnam_if, saudi_if):
+                       china_if, india_if, vietnam_if, saudi_if,
+                       atvr_mcap_col="Free Float MCap Y2025"):
     """Build clean Primary-only universe with Thailand NVDR exception."""
     import re as _re
     df = df_raw_orig.copy()
@@ -1128,8 +1140,8 @@ def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
                       df["6M ADTV Y2025"].where(df["6M ADTV Y2025"]>0,
                       df["3M ADTV Y2025"].where(df["3M ADTV Y2025"]>0,
                       df["1M ADTV Y2025"])))
-    df["ATVR"] = np.where(df["Free Float MCap Y2025"]>0,
-                          df["ADTV_Best"]*252/df["Free Float MCap Y2025"], 0)
+    df["ATVR"] = np.where(df[atvr_mcap_col]>0,
+                          df["ADTV_Best"]*252/df[atvr_mcap_col], 0)
     return df
 
 
@@ -1166,7 +1178,7 @@ def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Co
 
 def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, atvr_em,
                              max_price, thailand_mode, china_if, india_if, vietnam_if, saudi_if,
-                             min_ff_pct=0.15):
+                             min_ff_pct=0.15, atvr_mcap_col="Free Float MCap Y2025"):
     """Add secondary share classes for selected entities.
     Secondaries must pass the same liquidity, FF% and price checks as primaries.
     """
@@ -1217,8 +1229,8 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
                           df_sec["6M ADTV Y2025"].where(df_sec["6M ADTV Y2025"]>0,
                           df_sec["3M ADTV Y2025"].where(df_sec["3M ADTV Y2025"]>0,
                           df_sec["1M ADTV Y2025"])))
-    df_sec["ATVR"] = np.where(df_sec["Free Float MCap Y2025"]>0,
-                              df_sec["ADTV_Best"]*252/df_sec["Free Float MCap Y2025"], 0)
+    df_sec["ATVR"] = np.where(df_sec[atvr_mcap_col]>0,
+                              df_sec["ADTV_Best"]*252/df_sec[atvr_mcap_col], 0)
 
     # Classification — already set on df_raw_original at load time
     # Just filter out stocks with no mapping
@@ -1589,7 +1601,8 @@ with tab_gs:
 
     _gs_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        atvr_mcap_col=atvr_mcap_col)
 
     _gs_liq = apply_liquidity_new(_gs_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1604,7 +1617,7 @@ with tab_gs:
     _gs_final = add_secondary_listings(_gs_sorted, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        min_ff_pct=min_ff_pct)
+        min_ff_pct=min_ff_pct, atvr_mcap_col=atvr_mcap_col)
 
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
@@ -1641,7 +1654,8 @@ with tab_pc:
 
     _pc_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        atvr_mcap_col=atvr_mcap_col)
 
     _pc_liq = apply_liquidity_new(_pc_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1651,7 +1665,7 @@ with tab_pc:
     _pc_final = add_secondary_listings(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        min_ff_pct=min_ff_pct)
+        min_ff_pct=min_ff_pct, atvr_mcap_col=atvr_mcap_col)
 
     _pc_tot_adj = _pc_final["Adj_FF_MCap"].sum()
     _pc_final["Index_Weight"] = _pc_final["Adj_FF_MCap"]/_pc_tot_adj*100 if _pc_tot_adj>0 else 0
@@ -1688,7 +1702,8 @@ with tab_gimi:
 
     _gm_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
-        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor)
+        china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
+        atvr_mcap_col=atvr_mcap_col)
 
     # EUMSS calibration on DM (using small_thr = 99%)
     _gm_dm_all = _gm_u[_gm_u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
@@ -1743,7 +1758,7 @@ with tab_gimi:
         _gm_final = add_secondary_listings(_gm_std, df_raw_original, new_adtv_dm, new_adtv_em,
             new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
             china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-            min_ff_pct=min_ff_pct)
+            min_ff_pct=min_ff_pct, atvr_mcap_col=atvr_mcap_col)
 
         _gm_complete = pd.concat([_gm_final, _gm_small, _gm_above85, _gm_micro], ignore_index=True)
         _gm_complete = _gm_complete.drop_duplicates(subset=["Symbol"]).copy()
@@ -1794,6 +1809,7 @@ def compute_liquidity_matrix(
     china_if, india_if, vietnam_if, saudi_if,
     large_thr, mid_thr, small_thr,
     eumss_ff_ratio, em_threshold_pct,
+    atvr_mcap_col="Free Float MCap Y2025",
 ):
     """Compute ACWI stock count for all 32 parameter combinations × 4 methods."""
     matrix_params = [
@@ -1852,7 +1868,8 @@ def compute_liquidity_matrix(
         # Build primary-only universe (no FF% pre-filter — matches Tab 5/3/4 behavior)
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
-            china_if, india_if, vietnam_if, saudi_if)
+            china_if, india_if, vietnam_if, saudi_if,
+            atvr_mcap_col=atvr_mcap_col)
 
         # --- Global Sort ---
         liq_gs = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
@@ -1864,7 +1881,7 @@ def compute_liquidity_matrix(
                               np.where(gs_s["_c"] <= small_thr, "Small Cap", "Micro Cap")))
         gs_final = add_secondary_listings(gs_s, _df_raw_orig, adtv_dm, adtv_em,
             atvr_dm, atvr_em, max_price, thailand_mode,
-            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col)
         gs_count = gs_final[gs_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- Per Country ---
@@ -1873,7 +1890,7 @@ def compute_liquidity_matrix(
             group_col="Mapping Country", sort_col=sort_col)
         pc_final = add_secondary_listings(pc_s, _df_raw_orig, adtv_dm, adtv_em,
             atvr_dm, atvr_em, max_price, thailand_mode,
-            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+            china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col)
         pc_count = pc_final[pc_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- GIMI --- (exact replication of Tab 5 pipeline)
@@ -1910,7 +1927,7 @@ def compute_liquidity_matrix(
                     gm_std = pd.concat(gm_res, ignore_index=True)
                     gm_final = add_secondary_listings(gm_std, _df_raw_orig, adtv_dm, adtv_em,
                         atvr_dm, atvr_em, max_price, thailand_mode,
-                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col)
                     gm_count = gm_final[gm_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
         # --- ACWI V1 + Threshold (All listings) ---
@@ -1960,6 +1977,7 @@ def compute_gimi_matrix(
     china_if, india_if, vietnam_if, saudi_if,
     large_thr, mid_thr, small_thr,
     eumss_ff_ratio,
+    atvr_mcap_col="Free Float MCap Y2025",
 ):
     """Compute GIMI ACWI stock count + country weights for all 32 parameter combinations."""
     matrix_params = [
@@ -2019,7 +2037,8 @@ def compute_gimi_matrix(
 
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
-            china_if, india_if, vietnam_if, saudi_if)
+            china_if, india_if, vietnam_if, saudi_if,
+            atvr_mcap_col=atvr_mcap_col)
 
         # EUMSS calibration on full DM universe
         gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
@@ -2063,7 +2082,7 @@ def compute_gimi_matrix(
                     gm_std = pd.concat(gm_res, ignore_index=True)
                     gm_final = add_secondary_listings(gm_std, _df_raw_orig, adtv_dm, adtv_em,
                         atvr_dm, atvr_em, max_price, thailand_mode,
-                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col)
                     acwi = gm_final[gm_final["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
                     tot_adj = acwi["Adj_FF_MCap"].sum()
                     gm_count = len(acwi)
@@ -2206,6 +2225,7 @@ EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_f
             vietnam_inclusion_factor, saudi_inclusion_factor,
             large_thr, mid_thr, small_thr,
             new_eumss_ff_ratio, em_threshold_pct,
+            atvr_mcap_col=atvr_mcap_col,
         )
 
     @st.fragment
@@ -2291,6 +2311,7 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
             vietnam_inclusion_factor, saudi_inclusion_factor,
             large_thr, mid_thr, small_thr,
             new_eumss_ff_ratio,
+            atvr_mcap_col=atvr_mcap_col,
         )
 
     @st.fragment
