@@ -411,14 +411,14 @@ def to_excel_multi(sheets: dict):
 
 
 def normalize_index_weight(df, adj_col="Adj_FF_MCap"):
-    """Recalculate Index_Weight based on the sheet's own Adj_FF_MCap total."""
+    """Recalculate Index_Weight based on the sheet's own Adj_FF_MCap total, sorted descending."""
     df = df.copy()
     tot = df[adj_col].sum() if adj_col in df.columns else 0
     if tot > 0:
-        df["Index_Weight"] = (df[adj_col] / tot * 100).round(6)
+        df["Index_Weight"] = df[adj_col] / tot * 100
     else:
         df["Index_Weight"] = 0.0
-    return df
+    return df.sort_values("Index_Weight", ascending=False)
 
 
 SEGMENT_COLORS = {
@@ -1044,8 +1044,8 @@ Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {
         def _prep_t2(df):
             df = df.copy()
             tot = df["Adjusted FF MCap"].sum() if "Adjusted FF MCap" in df.columns else 0
-            df["Index_Weight"] = (df["Adjusted FF MCap"] / tot * 100).round(6) if tot > 0 else 0.0
-            return df
+            df["Index_Weight"] = df["Adjusted FF MCap"] / tot * 100 if tot > 0 else 0.0
+            return df.sort_values("Index_Weight", ascending=False)
 
         st.download_button("⬇️ Download ACWI als Excel",
             data=to_excel_multi({
