@@ -410,6 +410,17 @@ def to_excel_multi(sheets: dict):
     return buf.getvalue()
 
 
+def normalize_index_weight(df, adj_col="Adj_FF_MCap"):
+    """Recalculate Index_Weight based on the sheet's own Adj_FF_MCap total."""
+    df = df.copy()
+    tot = df[adj_col].sum() if adj_col in df.columns else 0
+    if tot > 0:
+        df["Index_Weight"] = (df[adj_col] / tot * 100).round(6)
+    else:
+        df["Index_Weight"] = 0.0
+    return df
+
+
 SEGMENT_COLORS = {
     "Large Cap": "#2979ff",
     "Mid Cap":   "#00e676",
@@ -1029,8 +1040,18 @@ Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {
 
         # Download
         _acwi_dl2 = pd.concat([df_acwi_dm, df_acwi_em], ignore_index=True)
+
+        def _prep_t2(df):
+            df = df.copy()
+            tot = df["Adjusted FF MCap"].sum() if "Adjusted FF MCap" in df.columns else 0
+            df["Index_Weight"] = (df["Adjusted FF MCap"] / tot * 100).round(6) if tot > 0 else 0.0
+            return df
+
         st.download_button("⬇️ Download ACWI als Excel",
-            data=to_excel_multi({"World Index (DM)":df_acwi_dm,"EM Index":df_acwi_em,"ACWI":_acwi_dl2,
+            data=to_excel_multi({
+                "World Index (DM)": _prep_t2(df_acwi_dm),
+                "EM Index":         _prep_t2(df_acwi_em),
+                "ACWI":             _prep_t2(_acwi_dl2),
                 "Parameter":pd.DataFrame([{"Parameter":"Methodik","Wert":"V1 Global Sort + EM Threshold"},
                     {"Parameter":"Listing","Wert":"All (Primary + Secondary)"},
                     {"Parameter":"Filter","Wert":"Post"},
@@ -1512,20 +1533,29 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
 
     # ── Download ──────────────────────────────────────────────────────────────
     st.markdown("---")
-    _drop = ["_cum_pct","ADTV_Best","ATVR"]
-    _world_dl = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap","Micro Cap"])].copy()
-    _acwi_dl  = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
-    _params_dl = pd.DataFrame([{"Parameter":k,"Wert":v} for k,v in params_dict.items()])
+    _drop = ["_cum_pct","_c","_cp2","ADTV_Best","IF"]
+    _drop_universe = _drop + ["Index_Weight"]  # Universe heeft geen Index_Weight
+
+    def _prep(df, adj_col="Adj_FF_MCap"):
+        cols = [c for c in df.columns if c not in _drop]
+        return normalize_index_weight(df[cols].copy(), adj_col)
+
+    _world_dm_dl  = df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _world_em_dl  = df_included[(df_included["Classification"]=="EM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _acwi_dl      = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
+    _world_imi_dl = df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+    _acwi_imi_dl  = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+    _params_dl    = pd.DataFrame([{"Parameter":k,"Wert":v} for k,v in params_dict.items()])
 
     st.download_button(
         f"⬇️ Download {tab_name} als Excel",
         data=to_excel_multi({
-            "Universe":         df_included[[c for c in df_included.columns if c not in _drop]],
-            "World Index (DM)": df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])][[c for c in df_included.columns if c not in _drop]],
-            "EM Index":         df_included[(df_included["Classification"]=="EM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap"])][[c for c in df_included.columns if c not in _drop]],
-            "ACWI Index":       _acwi_dl[[c for c in _acwi_dl.columns if c not in _drop]],
-            "World IMI":        df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])][[c for c in df_included.columns if c not in _drop]],
-            "ACWI IMI":         df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])][[c for c in df_included.columns if c not in _drop]],
+            "Universe":           df_included[[c for c in df_included.columns if c not in _drop_universe]],
+            "World Index (DM)":   _prep(_world_dm_dl),
+            "EM Index":           _prep(_world_em_dl),
+            "ACWI Index":         _prep(_acwi_dl),
+            "World IMI":          _prep(_world_imi_dl),
+            "ACWI IMI":           _prep(_acwi_imi_dl),
             "Parameter Settings": _params_dl,
         }),
         file_name=f"NaroIX_{tab_name.replace(' ','_')}.xlsx",
