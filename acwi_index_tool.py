@@ -2070,8 +2070,11 @@ def compute_gimi_matrix(
 
                     # Country weights via Mapping Country
                     for label, mapping_ctry in _country_map.items():
-                        ctry_adj = acwi[acwi["Mapping Country"].fillna("").str.upper() == mapping_ctry.upper()]["Adj_FF_MCap"].sum()
-                        row[label] = round(ctry_adj / tot_adj * 100, 4) if tot_adj > 0 else 0.0
+                        ctry_stocks = acwi[acwi["Mapping Country"].fillna("").str.upper() == mapping_ctry.upper()]
+                        ctry_count  = len(ctry_stocks)
+                        ctry_adj    = ctry_stocks["Adj_FF_MCap"].sum()
+                        ctry_w      = ctry_adj / tot_adj * 100 if tot_adj > 0 else 0.0
+                        row[label]  = f"{ctry_count} / {ctry_w:.2f}%"
 
         row["GIMI Stocks"] = gm_count
         results.append(row)
@@ -2294,7 +2297,7 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
     def _render_gm_filters(gm_df):
         def _style_gm(df):
             styles = pd.DataFrame("", index=df.index, columns=df.columns)
-            # Color GIMI Stocks column
+            # Color GIMI Stocks column only
             if "GIMI Stocks" in df.columns:
                 vals = pd.to_numeric(df["GIMI Stocks"], errors="coerce")
                 vmin, vmax = vals.min(), vals.max()
@@ -2303,16 +2306,6 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
                         v = vals[idx]
                         intensity = int((v - vmin) / (vmax - vmin) * 60)
                         styles.loc[idx, "GIMI Stocks"] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
-            # Color country columns with green gradient
-            for col in ["USA", "China", "Taiwan", "Indien", "Deutschland"]:
-                if col in df.columns:
-                    vals = pd.to_numeric(df[col], errors="coerce")
-                    vmin, vmax = vals.min(), vals.max()
-                    if vmax > vmin:
-                        for idx in df.index:
-                            v = vals[idx]
-                            intensity = int((v - vmin) / (vmax - vmin) * 60)
-                            styles.loc[idx, col] = f"background-color: rgba(0,230,118,{intensity/100+0.05}); color: #e8eaf6;"
             return styles
 
         st.markdown("**Filter**")
