@@ -1848,11 +1848,10 @@ def compute_liquidity_matrix(
         if_mode = p["IF greift bei:"]
         sort_col = "Adj_FF_MCap" if if_mode == "Selektion" else "Free Float MCap Y2025"
 
-        # Build primary-only universe
+        # Build primary-only universe (no FF% pre-filter — matches Tab 5/3/4 behavior)
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
             china_if, india_if, vietnam_if, saudi_if)
-        u = u[u["Free Float Percent"] >= ff_pct].copy()
 
         # --- Global Sort ---
         liq_gs = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
@@ -1876,7 +1875,8 @@ def compute_liquidity_matrix(
             china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
         pc_count = pc_final[pc_final["Segment_New"].isin(["Large Cap","Mid Cap"])].shape[0]
 
-        # --- GIMI ---
+        # --- GIMI --- (exact replication of Tab 5 pipeline)
+        # EUMSS calibration on full DM universe (no FF% pre-filter — matches Tab 5)
         gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
         gm_ff_tot = gm_dm_all["Free Float MCap Y2025"].sum()
         gm_count = 0
@@ -1886,6 +1886,7 @@ def compute_liquidity_matrix(
             if len(eumss_rows) > 0:
                 eumss_full = eumss_rows.iloc[0]["Total MCap Y2025"]
                 eumss_ff   = eumss_full * eumss_ff_ratio
+                # FF% check is part of EUMSS mask (not pre-applied) — matches Tab 5
                 mask_e = ((u["Total MCap Y2025"] >= eumss_full) &
                           (u["Free Float MCap Y2025"] >= eumss_ff) &
                           (u["Free Float Percent"] >= ff_pct))
@@ -1906,7 +1907,6 @@ def compute_liquidity_matrix(
                     gm_res.append(inc)
                 if gm_res:
                     gm_std = pd.concat(gm_res, ignore_index=True)
-                    # Add secondary listings — identical to Tab 5
                     gm_final = add_secondary_listings(gm_std, _df_raw_orig, adtv_dm, adtv_em,
                         atvr_dm, atvr_em, max_price, thailand_mode,
                         china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
