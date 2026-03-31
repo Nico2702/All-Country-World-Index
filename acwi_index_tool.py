@@ -2297,7 +2297,7 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
     def _render_gm_filters(gm_df):
         def _style_gm(df):
             styles = pd.DataFrame("", index=df.index, columns=df.columns)
-            # Color GIMI Stocks column only
+            # Blue gradient for GIMI Stocks
             if "GIMI Stocks" in df.columns:
                 vals = pd.to_numeric(df["GIMI Stocks"], errors="coerce")
                 vmin, vmax = vals.min(), vals.max()
@@ -2306,6 +2306,16 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
                         v = vals[idx]
                         intensity = int((v - vmin) / (vmax - vmin) * 60)
                         styles.loc[idx, "GIMI Stocks"] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
+            # Green gradient for country columns — parse % from "Stocks / X.XX%" string
+            for col in ["USA", "China", "Taiwan", "Indien", "Deutschland"]:
+                if col in df.columns:
+                    vals = df[col].str.extract(r"(\d+\.?\d*)\%$")[0].astype(float)
+                    vmin, vmax = vals.min(), vals.max()
+                    if vmax > vmin:
+                        for idx in df.index:
+                            v = vals[idx]
+                            intensity = int((v - vmin) / (vmax - vmin) * 60)
+                            styles.loc[idx, col] = f"background-color: rgba(0,200,100,{intensity/100+0.05}); color: #e8eaf6;"
             return styles
 
         st.markdown("**Filter**")
