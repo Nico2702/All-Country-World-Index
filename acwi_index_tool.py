@@ -1471,34 +1471,38 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
 
     with _d2:
         st.markdown("**Inclusion Factor Impact**")
+        _acwi_if = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
         _if_entries = [
-            ("China A-Shares (IF 20%)",
-             df_included["Exchange Country Name"].fillna("").str.upper()=="CHINA", china_if),
+            (f"China A-Shares (IF {china_if*100:.0f}%)",
+             _acwi_if["Exchange Country Name"].fillna("").str.upper()=="CHINA", china_if),
             ("China H-Shares / Red Chips (IF 100%)",
-             (df_included["Mapping Country"].fillna("").str.upper()=="CHINA") &
-             (df_included["Exchange Country Name"].fillna("").str.upper()!="CHINA"), 1.0),
-            ("Indien", df_included["Exchange Country Name"].fillna("").str.upper()=="INDIA", india_if),
-            ("Vietnam", df_included["Exchange Country Name"].fillna("").str.upper()=="VIETNAM", vietnam_if),
-            ("Saudi-Arabien", df_included["Exchange Country Name"].fillna("").str.upper()=="SAUDI ARABIA", saudi_if),
+             (_acwi_if["Mapping Country"].fillna("").str.upper()=="CHINA") &
+             (_acwi_if["Exchange Country Name"].fillna("").str.upper()!="CHINA"), 1.0),
+            (f"Indien (IF {india_if*100:.0f}%)",
+             _acwi_if["Exchange Country Name"].fillna("").str.upper()=="INDIA", india_if),
+            (f"Vietnam (IF {vietnam_if*100:.0f}%)",
+             _acwi_if["Exchange Country Name"].fillna("").str.upper()=="VIETNAM", vietnam_if),
+            (f"Saudi-Arabien (IF {saudi_if*100:.0f}%)",
+             _acwi_if["Exchange Country Name"].fillna("").str.upper()=="SAUDI ARABIA", saudi_if),
         ]
         _if_rows = []
-        _tot_ff = df_included["Free Float MCap Y2025"].sum()
-        _tot_adj2 = df_included["Adj_FF_MCap"].sum()
+        _tot_ff  = _acwi_if["Free Float MCap Y2025"].sum()
+        _tot_adj2 = _acwi_if["Adj_FF_MCap"].sum()
         for _nm, _msk, _fac in _if_entries:
-            _ff = df_included.loc[_msk,"Free Float MCap Y2025"].sum()
-            _adj = df_included.loc[_msk,"Adj_FF_MCap"].sum()
+            _ff  = _acwi_if.loc[_msk, "Free Float MCap Y2025"].sum()
+            _adj = _acwi_if.loc[_msk, "Adj_FF_MCap"].sum()
             if _ff > 0:
-                _if_rows.append({"Land":_nm,"Factor":f"{_fac*100:.0f}%",
-                    "Weight (vor)": round(_ff/_tot_ff*100,4) if _tot_ff>0 else 0,
-                    "Weight (nach)": round(_adj/_tot_adj2*100,4) if _tot_adj2>0 else 0,
-                    "Δ": round(_adj/_tot_adj2*100-_ff/_tot_ff*100,4) if _tot_ff>0 and _tot_adj2>0 else 0})
+                _if_rows.append({"Land":_nm, "Factor":f"{_fac*100:.0f}%",
+                    "Weight (vor)":  round(_ff  / _tot_ff   * 100, 4) if _tot_ff   > 0 else 0,
+                    "Weight (nach)": round(_adj / _tot_adj2 * 100, 4) if _tot_adj2 > 0 else 0,
+                    "Δ": round(_adj/_tot_adj2*100 - _ff/_tot_ff*100, 4) if _tot_ff>0 and _tot_adj2>0 else 0})
         if _if_rows:
             _if_df = pd.DataFrame(_if_rows)
             _if_df = pd.concat([_if_df, pd.DataFrame([{
                 "Land":"Total","Factor":"—",
-                "Weight (vor)": round(_if_df["Weight (vor)"].sum(),4),
-                "Weight (nach)": round(_if_df["Weight (nach)"].sum(),4),
-                "Δ": round(_if_df["Δ"].sum(),4)}])], ignore_index=True)
+                "Weight (vor)":  round(_if_df["Weight (vor)"].sum(),  4),
+                "Weight (nach)": round(_if_df["Weight (nach)"].sum(), 4),
+                "Δ":             round(_if_df["Δ"].sum(), 4)}])], ignore_index=True)
             def _sif(df):
                 def rs(row):
                     if row["Land"]=="Total": return ["background-color:#1a2a4a;font-weight:600;"]*len(row)
