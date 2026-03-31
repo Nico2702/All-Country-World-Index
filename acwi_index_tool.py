@@ -1984,53 +1984,57 @@ EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_f
             new_eumss_ff_ratio, em_threshold_pct,
         )
 
-    def _style_lm(df):
-        styles = pd.DataFrame("", index=df.index, columns=df.columns)
-        for col in ["ACWI (DM + EM)", "Global Sort", "Per Country", "GIMI Method"]:
-            if col in df.columns:
-                vals = pd.to_numeric(df[col], errors="coerce")
-                vmin, vmax = vals.min(), vals.max()
-                if vmax > vmin:
-                    for idx in df.index:
-                        v = vals[idx]
-                        intensity = int((v - vmin) / (vmax - vmin) * 60)
-                        styles.loc[idx, col] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
-        return styles
+    @st.fragment
+    def _render_lm_filters(lm_df):
+        def _style_lm(df):
+            styles = pd.DataFrame("", index=df.index, columns=df.columns)
+            for col in ["ACWI (DM + EM)", "Global Sort", "Per Country", "GIMI Method"]:
+                if col in df.columns:
+                    vals = pd.to_numeric(df[col], errors="coerce")
+                    vmin, vmax = vals.min(), vals.max()
+                    if vmax > vmin:
+                        for idx in df.index:
+                            v = vals[idx]
+                            intensity = int((v - vmin) / (vmax - vmin) * 60)
+                            styles.loc[idx, col] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
+            return styles
 
-    # ── Filter ────────────────────────────────────────────────────────────────
-    st.markdown("**Filter**")
-    _lm_f1, _lm_f2, _lm_f3 = st.columns(3)
-    _lm_f4, _lm_f5, _lm_f6 = st.columns(3)
+        st.markdown("**Filter**")
+        _lm_f1, _lm_f2, _lm_f3 = st.columns(3)
+        _lm_f4, _lm_f5, _lm_f6 = st.columns(3)
 
-    with _lm_f1:
-        _ff_opts = sorted(_lm_df["Free Float %"].unique().tolist())
-        _ff_sel  = st.multiselect("Free Float %", _ff_opts, default=_ff_opts, key="lm_ff")
-    with _lm_f2:
-        _adtv_dm_opts = sorted(_lm_df["ADTV DM"].unique().tolist())
-        _adtv_dm_sel  = st.multiselect("ADTV DM", _adtv_dm_opts, default=_adtv_dm_opts, key="lm_adtv_dm")
-    with _lm_f3:
-        _adtv_em_opts = sorted(_lm_df["ADTV EM"].unique().tolist())
-        _adtv_em_sel  = st.multiselect("ADTV EM", _adtv_em_opts, default=_adtv_em_opts, key="lm_adtv_em")
-    with _lm_f4:
-        _atvr_dm_opts = sorted(_lm_df["ATVR DM"].unique().tolist())
-        _atvr_dm_sel  = st.multiselect("ATVR DM", _atvr_dm_opts, default=_atvr_dm_opts, key="lm_atvr_dm")
-    with _lm_f5:
-        _atvr_em_opts = sorted(_lm_df["ATVR EM"].unique().tolist())
-        _atvr_em_sel  = st.multiselect("ATVR EM", _atvr_em_opts, default=_atvr_em_opts, key="lm_atvr_em")
+        with _lm_f1:
+            _ff_opts = sorted(lm_df["Free Float %"].unique().tolist())
+            _ff_sel  = st.multiselect("Free Float %", _ff_opts, default=_ff_opts, key="lm_ff")
+        with _lm_f2:
+            _adtv_dm_opts = sorted(lm_df["ADTV DM"].unique().tolist())
+            _adtv_dm_sel  = st.multiselect("ADTV DM", _adtv_dm_opts, default=_adtv_dm_opts, key="lm_adtv_dm")
+        with _lm_f3:
+            _adtv_em_opts = sorted(lm_df["ADTV EM"].unique().tolist())
+            _adtv_em_sel  = st.multiselect("ADTV EM", _adtv_em_opts, default=_adtv_em_opts, key="lm_adtv_em")
+        with _lm_f4:
+            _atvr_dm_opts = sorted(lm_df["ATVR DM"].unique().tolist())
+            _atvr_dm_sel  = st.multiselect("ATVR DM", _atvr_dm_opts, default=_atvr_dm_opts, key="lm_atvr_dm")
+        with _lm_f5:
+            _atvr_em_opts = sorted(lm_df["ATVR EM"].unique().tolist())
+            _atvr_em_sel  = st.multiselect("ATVR EM", _atvr_em_opts, default=_atvr_em_opts, key="lm_atvr_em")
 
-    _lm_filtered = _lm_df[
-        (_lm_df["Free Float %"].isin(_ff_sel)) &
-        (_lm_df["ADTV DM"].isin(_adtv_dm_sel)) &
-        (_lm_df["ADTV EM"].isin(_adtv_em_sel)) &
-        (_lm_df["ATVR DM"].isin(_atvr_dm_sel)) &
-        (_lm_df["ATVR EM"].isin(_atvr_em_sel))
-    ].copy()
+        _lm_filtered = lm_df[
+            (lm_df["Free Float %"].isin(_ff_sel)) &
+            (lm_df["ADTV DM"].isin(_adtv_dm_sel)) &
+            (lm_df["ADTV EM"].isin(_adtv_em_sel)) &
+            (lm_df["ATVR DM"].isin(_atvr_dm_sel)) &
+            (lm_df["ATVR EM"].isin(_atvr_em_sel))
+        ].copy()
 
-    st.caption(f"{len(_lm_filtered)} von {len(_lm_df)} Kombinationen angezeigt")
-    st.dataframe(_lm_filtered.style.apply(_style_lm, axis=None), use_container_width=True, hide_index=True, height=min(600, max(200, len(_lm_filtered)*38+40)))
-    st.download_button(
-        "⬇️ Download Liquidity Matrix als Excel",
-        data=to_excel_download(_lm_filtered, sheet_name="Liquidity Matrix"),
-        file_name="NaroIX_Liquidity_Matrix.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+        st.caption(f"{len(_lm_filtered)} von {len(lm_df)} Kombinationen angezeigt")
+        st.dataframe(_lm_filtered.style.apply(_style_lm, axis=None), use_container_width=True, hide_index=True,
+                     height=min(600, max(200, len(_lm_filtered)*38+40)))
+        st.download_button(
+            "⬇️ Download Liquidity Matrix als Excel",
+            data=to_excel_download(_lm_filtered, sheet_name="Liquidity Matrix"),
+            file_name="NaroIX_Liquidity_Matrix.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    _render_lm_filters(_lm_df)
