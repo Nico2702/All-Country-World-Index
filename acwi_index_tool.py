@@ -671,7 +671,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
-tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix = st.tabs([
+tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix, tab_gimi_matrix = st.tabs([
     "🌍 Universe Overview",
     "🌐 ACWI (DM + EM)",
     "📊 Global Sort (Threshold)",
@@ -679,6 +679,7 @@ tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix = st.t
     "⚡ GIMI Method",
     "🔀 ACWI & Varianten Vergleich",
     "🧮 Liquidity Matrix",
+    "🎯 GIMI Matrix",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1949,8 +1950,133 @@ def compute_liquidity_matrix(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 6: ACWI & Varianten Vergleich
+# GIMI MATRIX — Cached computation
 # ══════════════════════════════════════════════════════════════════════════════
+@st.cache_data
+def compute_gimi_matrix(
+    _df_raw_orig, _country_cls,
+    thailand_mode, max_price,
+    excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
+    china_if, india_if, vietnam_if, saudi_if,
+    large_thr, mid_thr, small_thr,
+    eumss_ff_ratio,
+):
+    """Compute GIMI ACWI stock count + country weights for all 32 parameter combinations."""
+    matrix_params = [
+        # FF 10%
+        {"Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.10, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.10, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.10, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        # FF 15%
+        {"Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 0,  "ATVR_EM": 0},
+        {"Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 10, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 10},
+        {"Free Float %": 0.15, "ADTV_DM": 2000000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM": 1000000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.15, "ADTV_DM": 1500000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+        {"Free Float %": 0.15, "ADTV_DM": 1000000, "ADTV_EM":  750000, "ATVR_DM": 20, "ATVR_EM": 15},
+    ]
+
+    # Country → Mapping Country lookup
+    _country_map = {
+        "USA":          "UNITED STATES",
+        "China":        "CHINA",
+        "Taiwan":       "TAIWAN",
+        "Indien":       "INDIA",
+        "Deutschland":  "GERMANY",
+    }
+
+    results = []
+    for p in matrix_params:
+        adtv_dm = p["ADTV_DM"]
+        adtv_em = p["ADTV_EM"]
+        atvr_dm = p["ATVR_DM"] / 100
+        atvr_em = p["ATVR_EM"] / 100
+        ff_pct  = p["Free Float %"]
+        sort_col = "Adj_FF_MCap"  # GIMI Matrix always Selektion
+
+        u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
+            excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
+            china_if, india_if, vietnam_if, saudi_if)
+
+        # EUMSS calibration on full DM universe
+        gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
+        gm_ff_tot = gm_dm_all["Free Float MCap Y2025"].sum()
+        gm_count  = 0
+        row = {
+            "Free Float %": f"{ff_pct*100:.0f}%",
+            "ADTV DM":  f"{adtv_dm/1e6:.1f}M",
+            "ADTV EM":  f"{adtv_em/1000:.0f}K",
+            "ATVR DM":  f"{p['ATVR_DM']}%",
+            "ATVR EM":  f"{p['ATVR_EM']}%",
+            "GIMI Stocks": 0,
+        }
+        for col in _country_map: row[col] = 0.0
+
+        if gm_ff_tot > 0:
+            gm_dm_all["_cp"] = gm_dm_all["Free Float MCap Y2025"].cumsum() / gm_ff_tot * 100
+            eumss_rows = gm_dm_all[gm_dm_all["_cp"] >= small_thr]
+            if len(eumss_rows) > 0:
+                eumss_full = eumss_rows.iloc[0]["Total MCap Y2025"]
+                eumss_ff   = eumss_full * eumss_ff_ratio
+                mask_e = ((u["Total MCap Y2025"] >= eumss_full) &
+                          (u["Free Float MCap Y2025"] >= eumss_ff) &
+                          (u["Free Float Percent"] >= ff_pct))
+                gm_e   = u[mask_e].copy()
+                gm_liq = apply_liquidity_new(gm_e, adtv_dm, adtv_em, atvr_dm, atvr_em)
+                gm_res = []
+                for _, grp in gm_liq.groupby("Mapping Country"):
+                    grp = grp.sort_values(sort_col, ascending=False).copy()
+                    tot_g = grp[sort_col].sum()
+                    if tot_g == 0: continue
+                    grp["_c"] = grp[sort_col].cumsum() / tot_g * 100
+                    cut = grp[grp["_c"] >= mid_thr].index
+                    inc = grp.loc[:cut[0]] if len(cut) > 0 else grp
+                    tot_i = inc[sort_col].sum()
+                    inc = inc.copy()
+                    inc["_cp2"] = inc[sort_col].cumsum() / tot_i * 100 if tot_i > 0 else 0
+                    inc["Segment_New"] = np.where(inc["_cp2"] <= large_thr, "Large Cap", "Mid Cap")
+                    gm_res.append(inc)
+                if gm_res:
+                    gm_std = pd.concat(gm_res, ignore_index=True)
+                    gm_final = add_secondary_listings(gm_std, _df_raw_orig, adtv_dm, adtv_em,
+                        atvr_dm, atvr_em, max_price, thailand_mode,
+                        china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct)
+                    acwi = gm_final[gm_final["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
+                    tot_adj = acwi["Adj_FF_MCap"].sum()
+                    gm_count = len(acwi)
+
+                    # Country weights via Mapping Country
+                    for label, mapping_ctry in _country_map.items():
+                        ctry_adj = acwi[acwi["Mapping Country"].fillna("").str.upper() == mapping_ctry.upper()]["Adj_FF_MCap"].sum()
+                        row[label] = round(ctry_adj / tot_adj * 100, 4) if tot_adj > 0 else 0.0
+
+        row["GIMI Stocks"] = gm_count
+        results.append(row)
+
+    return pd.DataFrame(results)
 with tab_compare:
     st.markdown("## 🔀 ACWI & Varianten Vergleich")
     st.caption("Vergleich aller vier Methoden: ACWI (V1+Threshold) | Global Sort | Per Country | GIMI")
@@ -2133,3 +2259,98 @@ EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_f
         )
 
     _render_lm_filters(_lm_df)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 8: GIMI Matrix
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_gimi_matrix:
+    st.markdown("## 🎯 GIMI Matrix")
+    st.caption("GIMI ACWI Stock Count + Ländergewichte (Adj. FF MCap %) für alle 32 Parameterkombinationen — IF: Selektion")
+
+    st.markdown(f"""
+<div class="info-box">
+<b>Fixierte Parameter (aus Sidebar)</b><br>
+Large: {large_thr}% &nbsp;|&nbsp; Mid: {mid_thr}% &nbsp;|&nbsp; Small: {small_thr}%<br>
+Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {india_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Vietnam {vietnam_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Saudi {saudi_inclusion_factor*100:.0f}%<br>
+EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
+<br>Variiert: Free Float % (10% / 15%) &nbsp;|&nbsp; ADTV DM/EM &nbsp;|&nbsp; ATVR DM/EM
+</div>
+""", unsafe_allow_html=True)
+
+    with st.spinner("Berechne GIMI Matrix (32 Kombinationen)..."):
+        _gm_df = compute_gimi_matrix(
+            df_raw_original, country_cls,
+            thailand_sec_type, max_closing_price,
+            exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds,
+            exclude_euro_mtf, exclude_etf_sicav,
+            china_inclusion_factor, india_inclusion_factor,
+            vietnam_inclusion_factor, saudi_inclusion_factor,
+            large_thr, mid_thr, small_thr,
+            new_eumss_ff_ratio,
+        )
+
+    @st.fragment
+    def _render_gm_filters(gm_df):
+        def _style_gm(df):
+            styles = pd.DataFrame("", index=df.index, columns=df.columns)
+            # Color GIMI Stocks column
+            if "GIMI Stocks" in df.columns:
+                vals = pd.to_numeric(df["GIMI Stocks"], errors="coerce")
+                vmin, vmax = vals.min(), vals.max()
+                if vmax > vmin:
+                    for idx in df.index:
+                        v = vals[idx]
+                        intensity = int((v - vmin) / (vmax - vmin) * 60)
+                        styles.loc[idx, "GIMI Stocks"] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
+            # Color country columns with green gradient
+            for col in ["USA", "China", "Taiwan", "Indien", "Deutschland"]:
+                if col in df.columns:
+                    vals = pd.to_numeric(df[col], errors="coerce")
+                    vmin, vmax = vals.min(), vals.max()
+                    if vmax > vmin:
+                        for idx in df.index:
+                            v = vals[idx]
+                            intensity = int((v - vmin) / (vmax - vmin) * 60)
+                            styles.loc[idx, col] = f"background-color: rgba(0,230,118,{intensity/100+0.05}); color: #e8eaf6;"
+            return styles
+
+        st.markdown("**Filter**")
+        _gm_f1, _gm_f2, _gm_f3 = st.columns(3)
+        _gm_f4, _gm_f5, _          = st.columns(3)
+
+        with _gm_f1:
+            _ff_opts = sorted(gm_df["Free Float %"].unique().tolist())
+            _ff_sel  = st.multiselect("Free Float %", _ff_opts, default=_ff_opts, key="gm_ff")
+        with _gm_f2:
+            _adtv_dm_opts = sorted(gm_df["ADTV DM"].unique().tolist())
+            _adtv_dm_sel  = st.multiselect("ADTV DM", _adtv_dm_opts, default=_adtv_dm_opts, key="gm_adtv_dm")
+        with _gm_f3:
+            _adtv_em_opts = sorted(gm_df["ADTV EM"].unique().tolist())
+            _adtv_em_sel  = st.multiselect("ADTV EM", _adtv_em_opts, default=_adtv_em_opts, key="gm_adtv_em")
+        with _gm_f4:
+            _atvr_dm_opts = sorted(gm_df["ATVR DM"].unique().tolist())
+            _atvr_dm_sel  = st.multiselect("ATVR DM", _atvr_dm_opts, default=_atvr_dm_opts, key="gm_atvr_dm")
+        with _gm_f5:
+            _atvr_em_opts = sorted(gm_df["ATVR EM"].unique().tolist())
+            _atvr_em_sel  = st.multiselect("ATVR EM", _atvr_em_opts, default=_atvr_em_opts, key="gm_atvr_em")
+
+        _gm_filtered = gm_df[
+            (gm_df["Free Float %"].isin(_ff_sel)) &
+            (gm_df["ADTV DM"].isin(_adtv_dm_sel)) &
+            (gm_df["ADTV EM"].isin(_adtv_em_sel)) &
+            (gm_df["ATVR DM"].isin(_atvr_dm_sel)) &
+            (gm_df["ATVR EM"].isin(_atvr_em_sel))
+        ].copy()
+
+        st.caption(f"{len(_gm_filtered)} von {len(gm_df)} Kombinationen angezeigt")
+        st.dataframe(_gm_filtered.style.apply(_style_gm, axis=None), use_container_width=True, hide_index=True,
+                     height=min(600, max(200, len(_gm_filtered)*38+40)))
+        st.download_button(
+            "⬇️ Download GIMI Matrix als Excel",
+            data=to_excel_download(_gm_filtered, sheet_name="GIMI Matrix"),
+            file_name="NaroIX_GIMI_Matrix.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    _render_gm_filters(_gm_df)
