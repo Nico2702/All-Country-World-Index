@@ -2149,6 +2149,8 @@ def compute_gimi_matrix(
         gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
         gm_ff_tot = gm_dm_all["Free Float MCap Y2025"].sum()
         gm_count  = 0
+        dm_count  = 0
+        em_count  = 0
         row = {
             "Free Float %": f"{ff_pct*100:.0f}%",
             "ADTV DM":  f"{adtv_dm/1e6:.1f}M",
@@ -2156,6 +2158,8 @@ def compute_gimi_matrix(
             "ATVR DM":  f"{p['ATVR_DM']}%",
             "ATVR EM":  f"{p['ATVR_EM']}%",
             "GIMI Stocks": 0,
+            "DM Stocks": 0,
+            "EM Stocks": 0,
         }
         for col in _country_map: row[col] = 0.0
 
@@ -2189,8 +2193,10 @@ def compute_gimi_matrix(
                         atvr_dm, atvr_em, max_price, thailand_mode,
                         china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col, excl_hk_cny=excl_hk_cny)
                     acwi = gm_final[gm_final["Segment_New"].isin(["Large Cap","Mid Cap"])].copy()
-                    tot_adj = acwi["Adj_FF_MCap"].sum()
+                    tot_adj  = acwi["Adj_FF_MCap"].sum()
                     gm_count = len(acwi)
+                    dm_count = (acwi["Classification"] == "DM").sum()
+                    em_count = (acwi["Classification"] == "EM").sum()
 
                     # Country weights via Mapping Country
                     for label, mapping_ctry in _country_map.items():
@@ -2201,6 +2207,8 @@ def compute_gimi_matrix(
                         row[label]  = f"{ctry_count} / {ctry_w:.2f}%"
 
         row["GIMI Stocks"] = gm_count
+        row["DM Stocks"]   = dm_count
+        row["EM Stocks"]   = em_count
         results.append(row)
 
     return pd.DataFrame(results)
@@ -2425,15 +2433,16 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
     def _render_gm_filters(gm_df):
         def _style_gm(df):
             styles = pd.DataFrame("", index=df.index, columns=df.columns)
-            # Blue gradient for GIMI Stocks
-            if "GIMI Stocks" in df.columns:
-                vals = pd.to_numeric(df["GIMI Stocks"], errors="coerce")
-                vmin, vmax = vals.min(), vals.max()
-                if vmax > vmin:
-                    for idx in df.index:
-                        v = vals[idx]
-                        intensity = int((v - vmin) / (vmax - vmin) * 60)
-                        styles.loc[idx, "GIMI Stocks"] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
+            # Blue gradient for GIMI Stocks, DM Stocks, EM Stocks
+            for col in ["GIMI Stocks", "DM Stocks", "EM Stocks"]:
+                if col in df.columns:
+                    vals = pd.to_numeric(df[col], errors="coerce")
+                    vmin, vmax = vals.min(), vals.max()
+                    if vmax > vmin:
+                        for idx in df.index:
+                            v = vals[idx]
+                            intensity = int((v - vmin) / (vmax - vmin) * 60)
+                            styles.loc[idx, col] = f"background-color: rgba(41,121,255,{intensity/100+0.05}); color: #e8eaf6;"
             # Green gradient for country columns — parse % from "Stocks / X.XX%" string
             for col in ["USA", "China", "Taiwan", "Indien", "Deutschland"]:
                 if col in df.columns:
