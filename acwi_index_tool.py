@@ -627,8 +627,19 @@ def load_excel(file):
             f"3M ADTV {year_suffix}":         "3M ADTV Y2025",
             f"6M ADTV {year_suffix}":         "6M ADTV Y2025",
             f"12M ADTV {year_suffix}":        "12M ADTV Y2025",
+            # Column name differences between FactSet export versions
+            "Country Name":                  "Exchange Country Name",
+            "Float PCT":                     "Free Float Percent",
+            "Inudstry":                      "Industry",   # typo in some exports
         }
         df = df.rename(columns=rename_map)
+
+        # If Exchange Country Name still missing, derive from Country of Incorp as fallback
+        if "Exchange Country Name" not in df.columns:
+            if "Country of Risk" in df.columns:
+                df["Exchange Country Name"] = df["Country of Risk"].fillna("")
+            else:
+                df["Exchange Country Name"] = ""
 
         return df, year_suffix
 
