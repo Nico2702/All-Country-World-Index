@@ -434,6 +434,16 @@ with st.sidebar:
     st.markdown("### 📁 Datenquelle")
     uploaded = st.file_uploader("FactSet Export (.xlsx)", type=["xlsx","xls"])
 
+    from datetime import date as _date
+    snapshot_date = st.date_input(
+        "Snapshot Datum",
+        value=_date(2025, 12, 31),
+        format="DD.MM.YYYY",
+        key="snapshot_date",
+        help="Datum des FactSet Exports — wird für Labels, Info-Boxen und Excel-Dateinamen verwendet."
+    )
+    _snapshot_label = snapshot_date.strftime("%d.%m.%Y")
+
     st.markdown("---")
     st.markdown("### 🌍 Universe & Exclusions")
     thailand_sec_type = st.radio("Thailand Sec Type:", ["NVDR","SHARE"], index=0,
@@ -453,6 +463,8 @@ with st.sidebar:
         exclude_naics_funds     = st.checkbox("NAICS Investment Funds", value=True, key="excl_naics")
         exclude_euro_mtf        = st.checkbox("Exchange Euro MTF / @NA", value=True, key="excl_euro")
         exclude_etf_sicav       = st.checkbox("Name: ETF / SICAV / %", value=True, key="excl_etf")
+        exclude_delisted        = st.checkbox("Listing Status = inaktiv (1)", value=True, key="excl_delisted",
+            help="Deaktivieren für historische Snapshots — delisted Stocks waren zum Snapshot-Datum ggf. noch aktiv handelbar.")
 
     st.markdown("---")
     st.markdown("### 📊 Size Segmentation")
@@ -583,12 +595,46 @@ with st.sidebar:
 # ─── Load Data ─────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_excel(file):
+    """Load FactSet export, auto-detecting header row and year suffix.
+    Returns (df, year_suffix) where columns are normalized to remove year suffix.
+    """
     try:
-        df = pd.read_excel(file, dtype=str)
-        return df
+        # Auto-detect header row (search first 10 rows for "Symbol" column)
+        header_row = 0
+        for i in range(10):
+            _probe = pd.read_excel(file, header=i, nrows=1, dtype=str)
+            if "Symbol" in _probe.columns:
+                header_row = i
+                break
+
+        df = pd.read_excel(file, header=header_row, dtype=str)
+
+        # Auto-detect year suffix from column names (e.g. "Total MCap Y2026" → "Y2026")
+        import re as _re
+        year_suffix = "Y2025"  # default fallback
+        for col in df.columns:
+            m = _re.search(r'(Y\d{4})$', col)
+            if m:
+                year_suffix = m.group(1)
+                break
+
+        # Normalize column names: remove year suffix so rest of code is year-agnostic
+        rename_map = {
+            f"Total MCap {year_suffix}":      "Total MCap Y2025",
+            f"Free Float MCap {year_suffix}": "Free Float MCap Y2025",
+            f"Free Float Percent":            "Free Float Percent",
+            f"1M ADTV {year_suffix}":         "1M ADTV Y2025",
+            f"3M ADTV {year_suffix}":         "3M ADTV Y2025",
+            f"6M ADTV {year_suffix}":         "6M ADTV Y2025",
+            f"12M ADTV {year_suffix}":        "12M ADTV Y2025",
+        }
+        df = df.rename(columns=rename_map)
+
+        return df, year_suffix
+
     except Exception as e:
         st.error(f"Fehler beim Laden der Datei: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(), "Y2025"
 
 @st.cache_data
 def load_classification(path="Country_Classification.xlsx"):
@@ -600,7 +646,7 @@ def load_classification(path="Country_Classification.xlsx"):
         return {}
 
 if uploaded:
-    df_raw = load_excel(uploaded)
+    df_raw, _year_suffix = load_excel(uploaded)
 else:
     st.info("👆 Bitte eine Excel-Datei hochladen um zu starten.")
     st.stop()
@@ -674,10 +720,11 @@ _cutoff_v1 = get_dm_cutoff_stock(_seg_dm_v1)
 
 
 # ─── Header ────────────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
 <div style='text-align:center;padding:10px 0 5px'>
   <span style='font-size:28px;font-weight:700;color:#A0B4FF;letter-spacing:2px;'>NaroIX</span>
   <span style='font-size:18px;color:#8892b0;'> — Index Construction Tool</span>
+  <br><span style='font-size:12px;color:#8892b0;'>Snapshot: {_snapshot_label} &nbsp;|&nbsp; Datenjahr: {_year_suffix}</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1073,7 +1120,7 @@ Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {
                     {"Parameter":"EM Threshold %","Wert":f"{em_threshold_pct:.1f}%"},
                     {"Parameter":"DM ADTV","Wert":f"{new_adtv_dm:,.0f}"},
                     {"Parameter":"EM ADTV","Wert":f"{new_adtv_em:,.0f}"}])}),
-            file_name="NaroIX_ACWI_V1_Threshold.xlsx",
+            file_name=f"NaroIX_ACWI_V1_Threshold_{_snapshot_label.replace(".","")}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.warning("Kein DM Grenzstock gefunden — bitte Daten prüfen.")
@@ -1084,7 +1131,8 @@ Inclusion Factor: China {china_inclusion_factor*100:.0f}% &nbsp;|&nbsp; Indien {
 def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
                        excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
                        china_if, india_if, vietnam_if, saudi_if,
-                       atvr_mcap_col="Free Float MCap Y2025"):
+                       atvr_mcap_col="Free Float MCap Y2025",
+                       excl_delisted=True):
     """Build clean Primary-only universe with Thailand NVDR exception."""
     import re as _re
     df = df_raw_orig.copy()
@@ -1119,6 +1167,8 @@ def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
         df = df[~df["Exchange Name"].fillna("").isin(["Euro MTF", "@NA"])].copy()
     if excl_etf:
         df = df[~df["Name"].fillna("").str.contains(_re.compile(r'\bETF\b|\bSICAV\b|%', _re.IGNORECASE))].copy()
+    if excl_delisted and "Listing Status" in df.columns:
+        df = df[df["Listing Status"].fillna("0").astype(str).str.strip() != "1"].copy()
 
     # Step 4: Classification
     df["Mapping Country"] = df.apply(
@@ -1594,7 +1644,7 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
             "ACWI IMI":           _prep(_acwi_imi_dl),
             "Parameter Settings": _params_dl,
         }),
-        file_name=f"NaroIX_{tab_name.replace(' ','_')}.xlsx",
+        file_name=f"NaroIX_{tab_name.replace(" ","_")}_{_snapshot_label.replace(".","")}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
@@ -1613,7 +1663,7 @@ with tab_gs:
     _gs_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
 
     _gs_liq = apply_liquidity_new(_gs_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1673,7 +1723,7 @@ with tab_pc:
     _pc_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
 
     _pc_liq = apply_liquidity_new(_pc_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1729,7 +1779,7 @@ with tab_gimi:
     _gm_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
 
     # EUMSS calibration on DM (using small_thr = 99%)
     _gm_dm_all = _gm_u[_gm_u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
@@ -1847,6 +1897,7 @@ def compute_liquidity_matrix(
     large_thr, mid_thr, small_thr,
     eumss_ff_ratio, em_threshold_pct,
     atvr_mcap_col="Free Float MCap Y2025",
+    excl_delisted=True,
 ):
     """Compute ACWI stock count for all 32 parameter combinations × 4 methods."""
     matrix_params = [
@@ -1906,7 +1957,7 @@ def compute_liquidity_matrix(
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
             china_if, india_if, vietnam_if, saudi_if,
-            atvr_mcap_col=atvr_mcap_col)
+            atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
 
         # --- Global Sort ---
         liq_gs = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
@@ -2015,6 +2066,7 @@ def compute_gimi_matrix(
     large_thr, mid_thr, small_thr,
     eumss_ff_ratio,
     atvr_mcap_col="Free Float MCap Y2025",
+    excl_delisted=True,
 ):
     """Compute GIMI ACWI stock count + country weights for all 32 parameter combinations."""
     matrix_params = [
@@ -2075,7 +2127,7 @@ def compute_gimi_matrix(
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
             china_if, india_if, vietnam_if, saudi_if,
-            atvr_mcap_col=atvr_mcap_col)
+            atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
 
         # EUMSS calibration on full DM universe
         gm_dm_all = u[u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
@@ -2263,6 +2315,7 @@ EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_f
             large_thr, mid_thr, small_thr,
             new_eumss_ff_ratio, em_threshold_pct,
             atvr_mcap_col=atvr_mcap_col,
+            excl_delisted=exclude_delisted,
         )
 
     @st.fragment
@@ -2314,7 +2367,7 @@ EM Threshold: {em_threshold_pct:.1f}% &nbsp;|&nbsp; EUMSS FF Ratio: {new_eumss_f
         st.download_button(
             "⬇️ Download Liquidity Matrix als Excel",
             data=to_excel_download(_lm_filtered, sheet_name="Liquidity Matrix"),
-            file_name="NaroIX_Liquidity_Matrix.xlsx",
+            file_name=f"NaroIX_Liquidity_Matrix_{_snapshot_label.replace(".","")}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
@@ -2349,6 +2402,7 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
             large_thr, mid_thr, small_thr,
             new_eumss_ff_ratio,
             atvr_mcap_col=atvr_mcap_col,
+            excl_delisted=exclude_delisted,
         )
 
     @st.fragment
@@ -2410,7 +2464,7 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
         st.download_button(
             "⬇️ Download GIMI Matrix als Excel",
             data=to_excel_download(_gm_filtered, sheet_name="GIMI Matrix"),
-            file_name="NaroIX_GIMI_Matrix.xlsx",
+            file_name=f"NaroIX_GIMI_Matrix_{_snapshot_label.replace(".","")}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
