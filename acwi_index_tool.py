@@ -862,7 +862,12 @@ with tab_overview:
         _m = (_exc_df["Name"].fillna("").str.contains(_re_ov.compile(r'\bETF\b|\bSICAV\b|%', _re_ov.IGNORECASE))) & (_exc_reason == "")
         _exc_reason[_m] = "Name: ETF / SICAV / %"
 
-    # 9. Kein Classification-Mapping
+    # 9. Listing Status = 1 (Inactive / Delisted)
+    if exclude_delisted and "Listing Status" in _exc_df.columns:
+        _m = (_exc_df["Listing Status"].fillna("0").astype(str).str.strip() == "1") & (_exc_reason == "")
+        _exc_reason[_m] = "Listing Status = 1 (Inactive / Delisted)"
+
+    # 10. Kein Classification-Mapping
     _exc_df["_MappingCountry"] = _exc_df.apply(
         lambda r: r["Country of Incorp"] if r.get("Exchange Country Name","") == r.get("Country of Incorp","")
                   else r.get("Country of Risk",""), axis=1)
