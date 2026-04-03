@@ -2158,6 +2158,8 @@ def compute_gimi_matrix(
             "ATVR DM":  f"{p['ATVR_DM']}%",
             "ATVR EM":  f"{p['ATVR_EM']}%",
             "GIMI Stocks": 0,
+            "DM/EM Ratio %": "—",
+            "DM/EM Weight": "—",
             "DM Stocks": 0,
             "EM Stocks": 0,
         }
@@ -2197,6 +2199,18 @@ def compute_gimi_matrix(
                     gm_count = len(acwi)
                     dm_count = (acwi["Classification"] == "DM").sum()
                     em_count = (acwi["Classification"] == "EM").sum()
+
+                    # DM/EM Ratio % (stock count)
+                    dm_ratio = dm_count / gm_count * 100 if gm_count > 0 else 0
+                    em_ratio = em_count / gm_count * 100 if gm_count > 0 else 0
+                    row["DM/EM Ratio %"] = f"{dm_ratio:.1f}% / {em_ratio:.1f}%"
+
+                    # DM/EM Weight (Adj. FF MCap)
+                    dm_adj = acwi[acwi["Classification"] == "DM"]["Adj_FF_MCap"].sum()
+                    em_adj = acwi[acwi["Classification"] == "EM"]["Adj_FF_MCap"].sum()
+                    dm_w = dm_adj / tot_adj * 100 if tot_adj > 0 else 0
+                    em_w = em_adj / tot_adj * 100 if tot_adj > 0 else 0
+                    row["DM/EM Weight"] = f"{dm_w:.1f}% / {em_w:.1f}%"
 
                     # Country weights via Mapping Country
                     for label, mapping_ctry in _country_map.items():
