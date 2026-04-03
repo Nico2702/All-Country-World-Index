@@ -1674,7 +1674,7 @@ with tab_gs:
     _gs_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=exclude_delisted)
 
     _gs_liq = apply_liquidity_new(_gs_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1734,7 +1734,7 @@ with tab_pc:
     _pc_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=exclude_delisted)
 
     _pc_liq = apply_liquidity_new(_pc_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
@@ -1790,7 +1790,7 @@ with tab_gimi:
     _gm_u = build_new_universe(df_raw_original, country_cls, thailand_sec_type, max_closing_price,
         exclude_hk_cny, exclude_country_risk_na, exclude_naics_funds, exclude_euro_mtf, exclude_etf_sicav,
         china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
-        atvr_mcap_col=atvr_mcap_col, excl_delisted=excl_delisted)
+        atvr_mcap_col=atvr_mcap_col, excl_delisted=exclude_delisted)
 
     # EUMSS calibration on DM (using small_thr = 99%)
     _gm_dm_all = _gm_u[_gm_u["Classification"]=="DM"].sort_values("Total MCap Y2025", ascending=False).copy()
