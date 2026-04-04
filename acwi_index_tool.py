@@ -446,9 +446,13 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 🌍 Universe & Exclusions")
-    thailand_sec_type = st.radio("Thailand Sec Type:", ["NVDR","SHARE"], index=0,
-        horizontal=True, key="thailand_sec_type",
-        help="NVDR: als Secondary behalten (investierbare Klasse). SHARE: normaler Primary.")
+    thailand_sec_type = st.radio(
+        "Thailand Modus:",
+        ["SHARE → NVDR", "SHARE only", "NVDR only"],
+        index=0,
+        key="thailand_sec_type",
+        help="SHARE → NVDR: Qualifikation (FF MCap/FF%/EUMSS) auf SHARE, Liquiditätscheck + Index auf NVDR (empfohlen).\nSHARE only: Nur Primary SHAREs, kein NVDR-Switch.\nNVDR only: NVDRs als Secondary (nur wenn FF MCap im NVDR vorhanden)."
+    )
 
     _cpa, _cpb = st.columns([3,4])
     with _cpa: use_max_price = st.checkbox("Max Price ≤", value=True, key="use_max_price")
@@ -688,10 +692,14 @@ for _df in [df_raw, df_raw_original]:
     _df["Classification"] = _df["Mapping Country"].map(country_cls)
 
 # ── Tab 2 (ACWI) specific: build All universe (legacy) ───────────────────────
-# Thailand filter
+# Thailand filter for all-listings universe (Tab 2)
 _th_mask = df_raw["Exchange Name"].fillna("").str.upper() == "THAILAND"
-_excl_type = "NVDR" if thailand_sec_type == "SHARE" else "SHARE"
-df_raw_all = df_raw[~(_th_mask & (df_raw["Sec Type"].fillna("") == _excl_type))].copy()
+if thailand_sec_type == "SHARE only":
+    df_raw_all = df_raw[~(_th_mask & (df_raw["Sec Type"].fillna("") == "NVDR"))].copy()
+elif thailand_sec_type == "NVDR only":
+    df_raw_all = df_raw[~(_th_mask & (df_raw["Sec Type"].fillna("") == "SHARE"))].copy()
+else:  # SHARE → NVDR: keep SHAREs for all-listings, NVDRs handled in build_new_universe
+    df_raw_all = df_raw[~(_th_mask & (df_raw["Sec Type"].fillna("") == "NVDR"))].copy()
 
 # Exclusions on All universe
 df_raw_all = df_raw_all[df_raw_all["Free Float MCap Y2025"] > 0].copy()
@@ -821,11 +829,21 @@ with tab_overview:
     _total_raw = len(_exc_df)
     _exc_reason = pd.Series([""] * _total_raw, index=_exc_df.index)
 
-    # 1. Thailand Sec Type
+    # 1. Thailand Modus
     _th_mask_ov = _exc_df["Exchange Name"].fillna("").str.upper() == "THAILAND"
-    _excl_type_ov = "SHARE" if thailand_sec_type == "NVDR" else "NVDR"
-    _m = _th_mask_ov & (_exc_df["Sec Type"].fillna("") == _excl_type_ov) & (_exc_reason == "")
-    _exc_reason[_m] = f"Thailand Sec Type ({_excl_type_ov} excluded)"
+    if thailand_sec_type == "SHARE only":
+        _m = _th_mask_ov & (_exc_df["Sec Type"].fillna("") == "NVDR") & (_exc_reason == "")
+        _exc_reason[_m] = "Thailand: NVDR excluded (SHARE only Modus)"
+    elif thailand_sec_type == "NVDR only":
+        _m = _th_mask_ov & (_exc_df["Sec Type"].fillna("") == "SHARE") & (_exc_reason == "")
+        _exc_reason[_m] = "Thailand: SHARE excluded (NVDR only Modus)"
+    else:  # SHARE → NVDR
+        # SHAREs without a corresponding NVDR are excluded
+        _th_nvdr_entities = set(_exc_df[_th_mask_ov & (_exc_df["Sec Type"].fillna("")=="NVDR")]["Entity ID"].dropna().unique())
+        _m = (_th_mask_ov & (_exc_df["Sec Type"].fillna("")=="SHARE") &
+              (~_exc_df["Entity ID"].isin(_th_nvdr_entities)) & (_exc_reason == ""))
+        _exc_reason[_m] = "Thailand: SHARE ohne NVDR (SHARE→NVDR Modus)"
+        # NVDRs without a corresponding qualified SHARE are excluded — handled by FF MCap = 0 check below
 
     # 2. FF MCap = 0 / negativ / fehlend
     _m = (_exc_df["Free Float MCap Y2025"] <= 0) & (_exc_reason == "")
@@ -1149,25 +1167,56 @@ def build_new_universe(df_raw_orig, country_cls, thailand_mode, max_price,
                        china_if, india_if, vietnam_if, saudi_if,
                        atvr_mcap_col="Free Float MCap Y2025",
                        excl_delisted=True):
-    """Build clean Primary-only universe with Thailand NVDR exception."""
+    """Build clean Primary-only universe with Thailand mode handling."""
     import re as _re
     df = df_raw_orig.copy()
     for col in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
                 "1M ADTV Y2025","3M ADTV Y2025","6M ADTV Y2025","12M ADTV Y2025","Closing Price"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Step 1: Thailand NVDR exception (before Primary filter)
+    # Step 1: Thailand mode handling
     _th = df["Exchange Name"].fillna("").str.upper() == "THAILAND"
-    if thailand_mode == "NVDR":
-        # Remove SHARE, keep NVDR (even though Secondary)
+
+    if thailand_mode == "NVDR only":
+        # Keep NVDRs (Secondary), remove Thai SHAREs
         df = df[~(_th & (df["Sec Type"].fillna("") == "SHARE"))].copy()
-    else:
-        # Remove NVDR, keep SHARE
+
+    elif thailand_mode == "SHARE only":
+        # Keep SHAREs (Primary), remove Thai NVDRs
         df = df[~(_th & (df["Sec Type"].fillna("") == "NVDR"))].copy()
 
-    # Step 2: Primary only (Thailand NVDRs already handled)
-    _th_nvdr = df["Exchange Name"].fillna("").str.upper() == "THAILAND"  # remaining Thai stocks
-    df = df[(df["Listing"].fillna("") == "Primary") | _th_nvdr].copy()
+    elif thailand_mode == "SHARE → NVDR":
+        # Qualify on SHARE (FF MCap/FF%), then switch to NVDR for index
+        # 1. Get Thai SHAREs and NVDRs separately
+        _th_shares = df[_th & (df["Sec Type"].fillna("") == "SHARE")].copy()
+        _th_nvdrs  = df[_th & (df["Sec Type"].fillna("") == "NVDR")].copy()
+        _non_thai  = df[~_th].copy()
+
+        # 2. Qualify SHAREs on FF MCap + FF%
+        _th_shares_qual = _th_shares[_th_shares["Free Float MCap Y2025"] > 0].copy()
+
+        # 3. Only keep SHAREs that have a corresponding NVDR
+        _nvdr_entities = set(_th_nvdrs["Entity ID"].dropna().unique())
+        _th_shares_qual = _th_shares_qual[
+            _th_shares_qual["Entity ID"].isin(_nvdr_entities)
+        ].copy()
+
+        # 4. Get the corresponding NVDRs
+        _qual_entities = set(_th_shares_qual["Entity ID"].dropna().unique())
+        _th_nvdrs_sel  = _th_nvdrs[_th_nvdrs["Entity ID"].isin(_qual_entities)].copy()
+
+        # 5. Transfer FF MCap, FF%, Total MCap, Closing Price from SHARE to NVDR
+        _ff_map = _th_shares_qual.set_index("Entity ID")
+        for _fld in ["Free Float MCap Y2025","Free Float Percent","Total MCap Y2025","Closing Price"]:
+            if _fld in _ff_map.columns:
+                _th_nvdrs_sel[_fld] = _th_nvdrs_sel["Entity ID"].map(_ff_map[_fld])
+
+        # 6. Rebuild df: non-Thai + enriched NVDRs (no Thai SHAREs)
+        df = pd.concat([_non_thai, _th_nvdrs_sel], ignore_index=True)
+
+    # Step 2: Primary only (NVDRs in SHARE→NVDR mode are already Secondary but included)
+    _th_remaining = df["Exchange Name"].fillna("").str.upper() == "THAILAND"
+    df = df[(df["Listing"].fillna("") == "Primary") | _th_remaining].copy()
 
     # Step 3: Exclusions
     df = df[df["Free Float MCap Y2025"] > 0].copy()
@@ -1255,12 +1304,17 @@ def add_secondary_listings(df_selected, df_raw_orig, adtv_dm, adtv_em, atvr_dm, 
         (df_raw_orig["Entity ID"].isin(selected_entities))
     ].copy()
 
-    # Thailand handling
+    # Thailand handling in secondary listings
     _th = df_sec["Exchange Name"].fillna("").str.upper() == "THAILAND"
-    if thailand_mode == "NVDR":
+    if thailand_mode == "NVDR only":
+        # Exclude Thai SHAREs from secondaries
         df_sec = df_sec[~(_th & (df_sec["Sec Type"].fillna("") == "SHARE"))].copy()
-    else:
+    elif thailand_mode == "SHARE only":
+        # Exclude Thai NVDRs from secondaries
         df_sec = df_sec[~(_th & (df_sec["Sec Type"].fillna("") == "NVDR"))].copy()
+    elif thailand_mode == "SHARE → NVDR":
+        # NVDRs are already in the main universe — exclude all Thai stocks from secondaries
+        df_sec = df_sec[~_th].copy()
 
     # HK CNY exclusion — same as primary pipeline
     if excl_hk_cny:
