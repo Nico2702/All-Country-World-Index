@@ -678,12 +678,21 @@ for _col in ["Total MCap Y2025","Free Float MCap Y2025","Free Float Percent",
         df_raw[_col] = pd.to_numeric(df_raw[_col], errors="coerce").fillna(0)
         df_raw_original[_col] = df_raw[_col]
 
-# Classification
+# Classification + Europe flag
 try:
-    _cls_df = pd.read_excel("Country_Classification.xlsx", usecols=["Exchange Country Name","Classification"])
+    _cls_df = pd.read_excel("Country_Classification.xlsx", usecols=["Exchange Country Name","Classification","Europe"])
     country_cls = _cls_df.set_index("Exchange Country Name")["Classification"].to_dict()
+    europe_countries = set(
+        _cls_df[_cls_df["Europe"].fillna("").str.upper() == "YES"]["Exchange Country Name"].tolist()
+    )
 except:
-    country_cls = {}
+    try:
+        _cls_df = pd.read_excel("Country_Classification.xlsx", usecols=["Exchange Country Name","Classification"])
+        country_cls = _cls_df.set_index("Exchange Country Name")["Classification"].to_dict()
+        europe_countries = set()
+    except:
+        country_cls = {}
+        europe_countries = set()
 
 # Apply Mapping Country + Classification to BOTH df_raw and df_raw_original
 # This must happen before any exclusions or filters so every stock — including
@@ -751,7 +760,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─── Tabs ──────────────────────────────────────────────────────────────────────
-tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix, tab_gimi_matrix = st.tabs([
+tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix, tab_gimi_matrix, tab_europe = st.tabs([
     "🌍 Universe Overview",
     "🌐 ACWI (DM + EM)",
     "📊 Global Sort (Threshold)",
@@ -760,6 +769,7 @@ tab_overview, tab_acwi, tab_gs, tab_pc, tab_gimi, tab_compare, tab_matrix, tab_g
     "🔀 ACWI & Varianten Vergleich",
     "🧮 Liquidity Matrix",
     "🎯 GIMI Matrix",
+    "🇪🇺 Europe Index",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2570,3 +2580,100 @@ EUMSS FF Ratio: {new_eumss_ff_ratio*100:.0f}%<br>
         )
 
     _render_gm_filters(_gm_df)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 9: Europe Index
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_europe:
+    st.markdown("## 🇪🇺 Europe Index")
+    st.caption("Basis: GIMI Method — World Index (DM Large+Mid), gefiltert auf europäische Länder (Country_Classification.xlsx, Spalte 'Europe = YES')")
+
+    if not europe_countries:
+        st.warning("⚠️ Keine europäischen Länder gefunden. Bitte prüfe ob die Spalte 'Europe' (YES/NO) in Country_Classification.xlsx vorhanden ist.")
+    else:
+        st.markdown(f"""
+<div class="info-box">
+<b>Eligible European Countries ({len(europe_countries)}):</b><br>
+{', '.join(sorted(europe_countries))}
+</div>
+""", unsafe_allow_html=True)
+
+        # Europe Index = World Index (DM Large+Mid) filtered to European countries
+        try:
+            _eu_dm = _gm_complete[
+                (_gm_complete["Classification"] == "DM") &
+                (_gm_complete["Segment_New"].isin(["Large Cap", "Mid Cap"])) &
+                (_gm_complete["Mapping Country"].isin(europe_countries))
+            ].copy()
+
+            # Renormalize weights
+            _eu_tot = _eu_dm["Adj_FF_MCap"].sum()
+            _eu_dm["Index_Weight"] = _eu_dm["Adj_FF_MCap"] / _eu_tot * 100 if _eu_tot > 0 else 0
+
+            # Sort descending by weight
+            _eu_dm = _eu_dm.sort_values("Index_Weight", ascending=False)
+
+            # ── Metrics ──────────────────────────────────────────────────────
+            _eu_large = _eu_dm[_eu_dm["Segment_New"] == "Large Cap"]
+            _eu_mid   = _eu_dm[_eu_dm["Segment_New"] == "Mid Cap"]
+
+            _mc1, _mc2, _mc3, _mc4, _mc5 = st.columns(5)
+            _mc1.metric("Europe Stocks", f"{len(_eu_dm):,}")
+            _mc2.metric("Large Cap", f"{len(_eu_large):,}")
+            _mc3.metric("Mid Cap", f"{len(_eu_mid):,}")
+            _mc4.metric("Länder", f"{_eu_dm['Mapping Country'].nunique():,}")
+            _mc5.metric("Adj. FF MCap", f"${_eu_tot/1e9:.1f}B")
+
+            # ── Country Breakdown ────────────────────────────────────────────
+            st.markdown("---")
+            _eu_col1, _eu_col2 = st.columns([2, 3])
+
+            with _eu_col1:
+                st.markdown("**Länder-Gewichtung**")
+                _eu_ctry = _eu_dm.groupby("Mapping Country").agg(
+                    Stocks=("Symbol", "count"),
+                    Adj_FF_MCap=("Adj_FF_MCap", "sum")
+                ).reset_index()
+                _eu_ctry["Weight %"] = (_eu_ctry["Adj_FF_MCap"] / _eu_tot * 100).round(2)
+                _eu_ctry = _eu_ctry.sort_values("Weight %", ascending=False)
+                _eu_ctry["Weight %"] = _eu_ctry["Weight %"].map(lambda x: f"{x:.2f}%")
+                _eu_ctry = _eu_ctry.drop(columns=["Adj_FF_MCap"])
+                st.dataframe(_eu_ctry, use_container_width=True, hide_index=True)
+
+            with _eu_col2:
+                st.markdown("**Top 20 Stocks**")
+                _top20_cols = ["Symbol", "Name", "Mapping Country", "Segment_New", "Index_Weight"]
+                _top20 = _eu_dm[[c for c in _top20_cols if c in _eu_dm.columns]].head(20).copy()
+                _top20["Index_Weight"] = _top20["Index_Weight"].map(lambda x: f"{x:.4f}%")
+                st.dataframe(_top20, use_container_width=True, hide_index=True)
+
+            # ── Download ─────────────────────────────────────────────────────
+            st.markdown("---")
+            _drop_eu = ["_cum_pct","_c","_cp2","ADTV_Best","IF","Index_Weight"]
+            _eu_dl = normalize_index_weight(_eu_dm[[c for c in _eu_dm.columns if c not in ["_cum_pct","_c","_cp2","ADTV_Best","IF"]].copy()])
+            _eu_large_dl = normalize_index_weight(_eu_dm[_eu_dm["Segment_New"]=="Large Cap"][[c for c in _eu_dm.columns if c not in ["_cum_pct","_c","_cp2","ADTV_Best","IF"]].copy()])
+            _eu_mid_dl   = normalize_index_weight(_eu_dm[_eu_dm["Segment_New"]=="Mid Cap"][[c for c in _eu_dm.columns if c not in ["_cum_pct","_c","_cp2","ADTV_Best","IF"]].copy()])
+
+            _eu_params = {
+                "Basis": "GIMI Method — World Index (DM Large+Mid)",
+                "Snapshot Datum": _snapshot_label,
+                "Europe Länder": ", ".join(sorted(europe_countries)),
+                "ADTV DM": f"{new_adtv_dm:,.0f}",
+                "ADTV EM": "n/a (nur DM)",
+                "Min FF%": f"{min_ff_pct*100:.0f}%",
+            }
+
+            st.download_button(
+                "⬇️ Download Europe Index als Excel",
+                data=to_excel_multi({
+                    "Europe Index":   _eu_dl,
+                    "Europe Large":   _eu_large_dl,
+                    "Europe Mid":     _eu_mid_dl,
+                    "Parameter Settings": pd.DataFrame([{"Parameter": k, "Wert": v} for k, v in _eu_params.items()]),
+                }),
+                file_name=f"NaroIX_Europe_Index_{_snapshot_label.replace('.','')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+        except NameError:
+            st.warning("⚠️ Bitte zuerst Tab '⚡ GIMI Method' aufrufen damit der World Index berechnet wird.")
