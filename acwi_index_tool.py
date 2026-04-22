@@ -483,7 +483,7 @@ with st.sidebar:
     with _sb: _small_raw = st.text_input("Small", value="99", key="small_thr_input", label_visibility="collapsed")
     _ffa, _ffb = st.columns([3,4])
     with _ffa: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>Min FF% (%)</div>", unsafe_allow_html=True)
-    with _ffb: _ff_raw = st.text_input("Min FF", value="15", key="min_ff_input", label_visibility="collapsed")
+    with _ffb: _ff_raw = st.text_input("Min FF", value="10", key="min_ff_input", label_visibility="collapsed")
 
     try:    large_thr  = int(_large_raw)
     except: large_thr  = 70
@@ -503,10 +503,10 @@ with st.sidebar:
     st.caption("Post-Filter für Tabs 2–4 | Pre-Filter für Tab 5 (GIMI)")
     _adtv_a, _adtv_b = st.columns([3,4])
     with _adtv_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM ADTV (USD)</div>", unsafe_allow_html=True)
-    with _adtv_b: _adtv_dm_raw = st.text_input("DM ADTV", value="1500000", key="adtv_dm_new", label_visibility="collapsed")
+    with _adtv_b: _adtv_dm_raw = st.text_input("DM ADTV", value="2000000", key="adtv_dm_new", label_visibility="collapsed")
     _adtv_c, _adtv_d = st.columns([3,4])
     with _adtv_c: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>EM ADTV (USD)</div>", unsafe_allow_html=True)
-    with _adtv_d: _adtv_em_raw = st.text_input("EM ADTV", value="750000", key="adtv_em_new", label_visibility="collapsed")
+    with _adtv_d: _adtv_em_raw = st.text_input("EM ADTV", value="1000000", key="adtv_em_new", label_visibility="collapsed")
     _atvr_a, _atvr_b = st.columns([3,4])
     with _atvr_a: st.markdown("<div style='padding-top:8px;font-size:13px;color:#e8eaf6;'>DM ATVR Min. (%)</div>", unsafe_allow_html=True)
     with _atvr_b: _atvr_dm_raw = st.text_input("DM ATVR", value="0", key="atvr_dm_new", label_visibility="collapsed")
@@ -575,6 +575,9 @@ with st.sidebar:
         help="Selektion: Adj_FF_MCap bestimmt Segment-Zuteilung (Large/Mid/Small).\nGewichtung: FF MCap bestimmt Selektion, IF wird nur für finale Indexgewichte angewendet."
     )
     if_sort_col = "Adj_FF_MCap" if if_selection_mode == "Selektion" else "Free Float MCap Y2025"
+    # Sort always on Total MCap (MSCI-konform), cumulative on if_sort_col
+    if_cum_col = if_sort_col  # cumulative basis (Adj_FF_MCap or FF MCap)
+    if_sort_col_size = "Total MCap Y2025"  # sort always on Total MCap
 
     st.markdown("---")
     st.markdown("### 🔧 Tab-spezifisch")
@@ -1273,17 +1276,20 @@ def apply_liquidity_new(df, adtv_dm, adtv_em, atvr_dm, atvr_em):
     return df[mask].copy()
 
 
-def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Country", sort_col="Adj_FF_MCap"):
-    """Assign Large/Mid/Small/Micro Cap segments per group."""
+def assign_segments_new(df, large_pct, mid_pct, small_pct, group_col="Mapping Country",
+                        sort_col="Total MCap Y2025", cum_col="Adj_FF_MCap"):
+    """Assign Large/Mid/Small/Micro Cap segments per group.
+    Sort on sort_col (Total MCap), cumulative on cum_col (Adj_FF_MCap) — MSCI-konform.
+    """
     results = []
     for grp_val, grp in df.groupby(group_col):
         grp = grp.sort_values(sort_col, ascending=False).copy()
-        total = grp[sort_col].sum()
+        total = grp[cum_col].sum()
         if total == 0:
             grp["Segment_New"] = "Micro Cap"
             results.append(grp)
             continue
-        grp["_cum_pct"] = grp[sort_col].cumsum() / total * 100
+        grp["_cum_pct"] = grp[cum_col].cumsum() / total * 100
         grp["Segment_New"] = np.where(grp["_cum_pct"] <= large_pct, "Large Cap",
                              np.where(grp["_cum_pct"] <= mid_pct,   "Mid Cap",
                              np.where(grp["_cum_pct"] <= small_pct, "Small Cap", "Micro Cap")))
@@ -1737,10 +1743,10 @@ with tab_gs:
 
     _gs_liq = apply_liquidity_new(_gs_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
-    # Global sort → segments
+    # Global sort → segments (Sort: Total MCap, Cumulative: if_cum_col — MSCI-konform)
     _gs_sorted = _gs_liq.sort_values("Total MCap Y2025", ascending=False).copy()
-    _gs_sort_tot = _gs_sorted[if_sort_col].sum()
-    _gs_sorted["_cum_pct"] = _gs_sorted[if_sort_col].cumsum() / _gs_sort_tot * 100 if _gs_sort_tot>0 else 0
+    _gs_sort_tot = _gs_sorted[if_cum_col].sum()
+    _gs_sorted["_cum_pct"] = _gs_sorted[if_cum_col].cumsum() / _gs_sort_tot * 100 if _gs_sort_tot>0 else 0
     _gs_sorted["Segment_New"] = np.where(_gs_sorted["_cum_pct"] <= large_thr, "Large Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= mid_thr,   "Mid Cap",
                                 np.where(_gs_sorted["_cum_pct"] <= small_thr, "Small Cap", "Micro Cap")))
@@ -1798,7 +1804,7 @@ with tab_pc:
     _pc_liq = apply_liquidity_new(_pc_u, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
     _pc_seg = assign_segments_new(_pc_liq, large_thr, mid_thr, small_thr,
-        group_col="Mapping Country", sort_col=if_sort_col)
+        group_col="Mapping Country", sort_col=if_sort_col_size, cum_col=if_cum_col)
 
     _pc_final = add_secondary_listings(_pc_seg, df_raw_original, new_adtv_dm, new_adtv_em,
         new_atvr_dm, new_atvr_em, max_closing_price, thailand_sec_type,
@@ -1872,18 +1878,19 @@ with tab_gimi:
         # Pre-liquidity filter
         _gm_liq = apply_liquidity_new(_gm_eumss, new_adtv_dm, new_adtv_em, new_atvr_dm, new_atvr_em)
 
-        # Coverage per country → Standard Index (sort_col: if_sort_col)
+        # Coverage per country → Standard Index
+        # Sort: Total MCap (MSCI-konform), Cumulative: if_cum_col (Adj_FF_MCap or FF MCap)
         _gm_results = []
         for _ctry, _grp in _gm_liq.groupby("Mapping Country"):
-            _grp = _grp.sort_values(if_sort_col, ascending=False).copy()
-            _tot = _grp[if_sort_col].sum()
+            _grp = _grp.sort_values("Total MCap Y2025", ascending=False).copy()
+            _tot = _grp[if_cum_col].sum()
             if _tot == 0: continue
-            _grp["_c"] = _grp[if_sort_col].cumsum() / _tot * 100
+            _grp["_c"] = _grp[if_cum_col].cumsum() / _tot * 100
             _cut = _grp[_grp["_c"] >= mid_thr].index
             _inc = _grp.loc[:_cut[0]] if len(_cut)>0 else _grp
-            _tot_inc = _inc[if_sort_col].sum()
+            _tot_inc = _inc[if_cum_col].sum()
             _inc = _inc.copy()
-            _inc["_cp2"] = _inc[if_sort_col].cumsum() / _tot_inc * 100 if _tot_inc>0 else 0
+            _inc["_cp2"] = _inc[if_cum_col].cumsum() / _tot_inc * 100 if _tot_inc>0 else 0
             _inc["Segment_New"] = np.where(_inc["_cp2"] <= large_thr, "Large Cap", "Mid Cap")
             _gm_results.append(_inc)
 
@@ -2022,6 +2029,7 @@ def compute_liquidity_matrix(
         ff_pct  = p["Free Float %"]
         if_mode = p["IF greift bei:"]
         sort_col = "Adj_FF_MCap" if if_mode == "Selektion" else "Free Float MCap Y2025"
+        # sort_col is now only for cumulative; sort always on Total MCap
 
         # Build primary-only universe (no FF% pre-filter — matches Tab 5/3/4 behavior)
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
@@ -2045,7 +2053,7 @@ def compute_liquidity_matrix(
         # --- Per Country ---
         liq_pc = apply_liquidity_new(u, adtv_dm, adtv_em, atvr_dm, atvr_em)
         pc_s = assign_segments_new(liq_pc, large_thr, mid_thr, small_thr,
-            group_col="Mapping Country", sort_col=sort_col)
+            group_col="Mapping Country", sort_col="Total MCap Y2025", cum_col=sort_col)
         pc_final = add_secondary_listings(pc_s, _df_raw_orig, adtv_dm, adtv_em,
             atvr_dm, atvr_em, max_price, thailand_mode,
             china_if, india_if, vietnam_if, saudi_if, min_ff_pct=ff_pct, atvr_mcap_col=atvr_mcap_col, excl_hk_cny=excl_hk_cny)
@@ -2070,7 +2078,7 @@ def compute_liquidity_matrix(
                 gm_liq = apply_liquidity_new(gm_e, adtv_dm, adtv_em, atvr_dm, atvr_em)
                 gm_res = []
                 for _, grp in gm_liq.groupby("Mapping Country"):
-                    grp = grp.sort_values(sort_col, ascending=False).copy()
+                    grp = grp.sort_values("Total MCap Y2025", ascending=False).copy()
                     tot_g = grp[sort_col].sum()
                     if tot_g == 0: continue
                     grp["_c"] = grp[sort_col].cumsum() / tot_g * 100
@@ -2192,7 +2200,7 @@ def compute_gimi_matrix(
         atvr_dm = p["ATVR_DM"] / 100
         atvr_em = p["ATVR_EM"] / 100
         ff_pct  = p["Free Float %"]
-        sort_col = "Adj_FF_MCap"  # GIMI Matrix always Selektion
+        sort_col = "Adj_FF_MCap"  # GIMI Matrix always Selektion (cumulative basis only)
 
         u = build_new_universe(_df_raw_orig, _country_cls, thailand_mode, max_price,
             excl_hk_cny, excl_cor_na, excl_naics, excl_euro, excl_etf,
@@ -2232,7 +2240,7 @@ def compute_gimi_matrix(
                 gm_liq = apply_liquidity_new(gm_e, adtv_dm, adtv_em, atvr_dm, atvr_em)
                 gm_res = []
                 for _, grp in gm_liq.groupby("Mapping Country"):
-                    grp = grp.sort_values(sort_col, ascending=False).copy()
+                    grp = grp.sort_values("Total MCap Y2025", ascending=False).copy()
                     tot_g = grp[sort_col].sum()
                     if tot_g == 0: continue
                     grp["_c"] = grp[sort_col].cumsum() / tot_g * 100
