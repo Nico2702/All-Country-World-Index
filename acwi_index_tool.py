@@ -1707,8 +1707,8 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
         cols = [c for c in df.columns if c not in _drop]
         return normalize_index_weight(df[cols].copy(), adj_col)
 
-    # Universe sheet: use df_universe if provided (full primary universe),
-    # otherwise fall back to df_included
+    # Universe sheet: use df_universe if provided (full primary+secondary after exclusions)
+    # This matches the Universe Overview count in Tab 1
     _universe_dl = (df_universe if df_universe is not None else df_included).copy()
     _universe_dl = _universe_dl[[c for c in _universe_dl.columns if c not in _drop_universe]]
 
@@ -1731,10 +1731,10 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
         "ACWI Index":         _prep(_acwi_dl),
         "World IMI":          _prep(_world_imi_dl),
         "ACWI IMI":           _prep(_acwi_imi_dl),
-        "Parameter Settings": _params_dl,
     }
     if europe_countries and len(_europe_dl) > 0:
         _sheets["Europe Index"] = _prep(_europe_dl)
+    _sheets["Parameter Settings"] = _params_dl
 
     st.download_button(
         f"⬇️ Download {tab_name} als Excel",
@@ -1812,7 +1812,7 @@ with tab_gs:
         diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
         adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
         small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
-        df_universe=_gs_u_full)
+        df_universe=df_raw_all)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1875,7 +1875,7 @@ with tab_pc:
         diag_caption=f"IF Anwendung: {if_selection_mode} | Sort-Spalte: {if_sort_col}",
         adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
         small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
-        df_universe=_pc_u_full)
+        df_universe=df_raw_all)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1997,7 +1997,7 @@ with tab_gimi:
             diag_caption=_gm_diag_caption,
             adtv_dm=new_adtv_dm, adtv_em=new_adtv_em, atvr_dm=new_atvr_dm, atvr_em=new_atvr_em,
             small_pct=small_thr, min_ff=min_ff_pct, if_mode=if_selection_mode,
-            df_universe=_gm_u_full)
+            df_universe=df_raw_all)
     else:
         st.error("Keine DM Stocks gefunden.")
 
