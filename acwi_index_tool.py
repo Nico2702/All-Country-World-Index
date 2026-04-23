@@ -1717,20 +1717,29 @@ Small Cap und Micro Cap werden relativ zum jeweiligen Standard Index ausgewiesen
     _acwi_dl      = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap"])]
     _world_imi_dl = df_included[(df_included["Classification"]=="DM") & df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
     _acwi_imi_dl  = df_included[df_included["Segment_New"].isin(["Large Cap","Mid Cap","Small Cap"])]
+    _europe_dl    = df_included[
+        (df_included["Classification"]=="DM") &
+        (df_included["Segment_New"].isin(["Large Cap","Mid Cap"])) &
+        (df_included["Mapping Country"].isin(europe_countries))
+    ] if europe_countries else pd.DataFrame()
     _params_dl    = pd.DataFrame([{"Parameter":k,"Wert":v} for k,v in params_dict.items()])
+
+    _sheets = {
+        "Universe":           _universe_dl,
+        "World Index (DM)":   _prep(_world_dm_dl),
+        "EM Index":           _prep(_world_em_dl),
+        "ACWI Index":         _prep(_acwi_dl),
+        "World IMI":          _prep(_world_imi_dl),
+        "ACWI IMI":           _prep(_acwi_imi_dl),
+        "Parameter Settings": _params_dl,
+    }
+    if europe_countries and len(_europe_dl) > 0:
+        _sheets["Europe Index"] = _prep(_europe_dl)
 
     st.download_button(
         f"⬇️ Download {tab_name} als Excel",
-        data=to_excel_multi({
-            "Universe":           _universe_dl,
-            "World Index (DM)":   _prep(_world_dm_dl),
-            "EM Index":           _prep(_world_em_dl),
-            "ACWI Index":         _prep(_acwi_dl),
-            "World IMI":          _prep(_world_imi_dl),
-            "ACWI IMI":           _prep(_acwi_imi_dl),
-            "Parameter Settings": _params_dl,
-        }),
-        file_name=f"NaroIX_{tab_name.replace(" ","_")}_{_snapshot_label.replace(".","")}.xlsx",
+        data=to_excel_multi(_sheets),
+        file_name=f"NaroIX_{tab_name.replace(' ','_')}_{_snapshot_label.replace('.','')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
@@ -1769,11 +1778,18 @@ with tab_gs:
     _gs_tot_adj = _gs_final["Adj_FF_MCap"].sum()
     _gs_final["Index_Weight"] = _gs_final["Adj_FF_MCap"]/_gs_tot_adj*100 if _gs_tot_adj>0 else 0
 
-    # Full universe for download: _gs_u with segment labels
+    # Full universe for download: _gs_u with segment labels + re-added secondaries
     _gs_seg_map = {**dict(zip(_gs_sorted["Symbol"], _gs_sorted["Segment_New"])),
                    **dict(zip(_gs_final["Symbol"],  _gs_final["Segment_New"]))}
     _gs_u_full = _gs_u.copy()
     _gs_u_full["Segment_New"] = _gs_u_full["Symbol"].map(_gs_seg_map).fillna("Excluded")
+
+    _gs_secondaries = _gs_final[
+        (_gs_final["Listing"].fillna("") == "Secondary") &
+        (~_gs_final["Symbol"].isin(set(_gs_u_full["Symbol"])))
+    ].copy()
+    if len(_gs_secondaries) > 0:
+        _gs_u_full = pd.concat([_gs_u_full, _gs_secondaries], ignore_index=True)
 
     _gs_all = df_raw_all[df_raw_all["Classification"].notna()]
     _gs_diag = [
@@ -1830,6 +1846,13 @@ with tab_pc:
     _pc_all_seg = {**_pc_seg_map, **_pc_final_map}
     _pc_u_full = _pc_u.copy()
     _pc_u_full["Segment_New"] = _pc_u_full["Symbol"].map(_pc_all_seg).fillna("Excluded")
+
+    _pc_secondaries = _pc_final[
+        (_pc_final["Listing"].fillna("") == "Secondary") &
+        (~_pc_final["Symbol"].isin(set(_pc_u_full["Symbol"])))
+    ].copy()
+    if len(_pc_secondaries) > 0:
+        _pc_u_full = pd.concat([_pc_u_full, _pc_secondaries], ignore_index=True)
 
     _pc_all = df_raw_all[df_raw_all["Classification"].notna()]
     _pc_diag = [
@@ -1955,10 +1978,18 @@ with tab_gimi:
             "DM ATVR (%)":f"{new_atvr_dm*100:.0f}%","EM ATVR (%)":f"{new_atvr_em*100:.0f}%",
             "Max Price (USD)":f"{max_closing_price:,.0f}" if max_closing_price else "—"}
 
-        # Full universe for download: _gm_u with segment labels
+        # Full universe for download: _gm_u with segment labels + re-added secondaries
         _gm_seg_map = dict(zip(_gm_complete["Symbol"], _gm_complete["Segment_New"]))
         _gm_u_full = _gm_u.copy()
         _gm_u_full["Segment_New"] = _gm_u_full["Symbol"].map(_gm_seg_map).fillna("Excluded")
+
+        # Add re-added secondaries (they are in _gm_final but not in _gm_u)
+        _gm_secondaries = _gm_final[
+            (_gm_final["Listing"].fillna("") == "Secondary") &
+            (~_gm_final["Symbol"].isin(set(_gm_u_full["Symbol"])))
+        ].copy()
+        if len(_gm_secondaries) > 0:
+            _gm_u_full = pd.concat([_gm_u_full, _gm_secondaries], ignore_index=True)
 
         render_new_tab("GIMI Method", _gm_complete, large_thr, mid_thr,
             china_inclusion_factor, india_inclusion_factor, vietnam_inclusion_factor, saudi_inclusion_factor,
